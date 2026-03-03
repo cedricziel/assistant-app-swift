@@ -1,0 +1,21 @@
+included:
+  - Sources
+
+excluded:
+  - Assistant.xcodeproj
+  - Resources
+
+disabled_rules:
+  - trailing_whitespace
+  - vertical_whitespace
+  - opening_brace
+  - statement_position
+  - colon
+  - comma
+  - control_statement
+  - operator_usage_whitespace
+  - return_arrow_whitespace
+  - trailing_comma
+  - line_length
+
+reporter: "xcode"

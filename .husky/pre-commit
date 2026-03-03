@@ -53,6 +53,12 @@ if [[ ${#swift_files[@]} -gt 0 ]]; then
         exit 1
     fi
 
+    if ! has_cmd swiftlint; then
+        echo "pre-commit: swiftlint is required when committing .swift files"
+        echo "Install with: brew install swiftlint"
+        exit 1
+    fi
+
     for file in "${swift_files[@]}"; do
         swiftformat "$file"
     done
@@ -61,6 +67,10 @@ if [[ ${#swift_files[@]} -gt 0 ]]; then
 
     for file in "${swift_files[@]}"; do
         swiftformat --lint "$file"
+    done
+
+    for file in "${swift_files[@]}"; do
+        swiftlint lint --strict "$file"
     done
 fi
 

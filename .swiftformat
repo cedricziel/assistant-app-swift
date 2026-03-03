@@ -1,0 +1,13 @@
+--swiftversion 6.2
+--indent 4
+--linebreaks lf
+--maxwidth 120
+--trimwhitespace always
+--allman false
+--wraparguments preserve
+--wrapparameters preserve
+--wrapcollections preserve
+--wrapconditions preserve
+--wrapreturntype preserve
+--ifdef no-indent
+--self remove
