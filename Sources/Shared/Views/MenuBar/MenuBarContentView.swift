@@ -31,7 +31,7 @@ struct MenuBarContentView: View {
                 ChatInputBar(
                     text: $quickReplyText,
                     isSending: chatStore.isSending(threadID: thread.id),
-                    placeholder: "Quick reply"
+                    placeholder: "Quick reply",
                 ) { text in
                     quickReplyText = ""
                     Task {
@@ -42,11 +42,20 @@ struct MenuBarContentView: View {
                 ContentUnavailableView(
                     "Open Assistant",
                     systemImage: "message",
-                    description: Text("Use the main window to connect an account before chatting from the menu bar.")
+                    description: Text("Use the main window to connect an account before chatting from the menu bar."),
                 )
             }
         }
         .padding(.horizontal)
+        .onAppear(perform: hydrateActiveAccountThreads)
+        .onChange(of: accountStore.activeAccountID) {
+            hydrateActiveAccountThreads()
+        }
+    }
+
+    private func hydrateActiveAccountThreads() {
+        guard let account = accountStore.activeAccount else { return }
+        chatStore.loadThreadsIfNeeded(for: account)
     }
 }
 

@@ -13,15 +13,18 @@ final class ChatStore: ObservableObject {
 
     init(
         chatService: ChatService = ChatService(),
-        threadPersistence: ChatThreadPersisting = ChatThreadPersistence()
+        threadPersistence: ChatThreadPersisting = ChatThreadPersistence(),
     ) {
         self.chatService = chatService
         self.threadPersistence = threadPersistence
     }
 
     func threads(for account: AssistantAccount) -> [ChatThread] {
+        threadsByAccount[account.id] ?? []
+    }
+
+    func loadThreadsIfNeeded(for account: AssistantAccount) {
         hydrateThreadsIfNeeded(for: account)
-        return threadsByAccount[account.id] ?? []
     }
 
     func ensureDefaultThread(for account: AssistantAccount) -> ChatThread {
