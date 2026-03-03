@@ -2,11 +2,17 @@ import Foundation
 
 struct ChatService {
     enum ChatServiceError: LocalizedError {
-        case notImplemented
+        case responseMissing
 
         var errorDescription: String? {
-            "Chat streaming has not been wired up to the backend yet."
+            "The assistant did not return any content."
         }
+    }
+
+    private let remoteService: RemoteAssistantService
+
+    init(remoteService: RemoteAssistantService = RemoteAssistantService()) {
+        self.remoteService = remoteService
     }
 
     func sendMessage(
@@ -14,9 +20,13 @@ struct ChatService {
         for account: AssistantAccount,
         in thread: ChatThread
     ) async throws -> ChatMessage {
-        // This is a placeholder that mimics assistant latency and echoes the request.
-        try await Task.sleep(nanoseconds: 800_000_000)
-        let echo = "(\(account.server.displayName)) \(content)"
-        return ChatMessage(role: .assistant, content: "Echo: \(echo)")
+        switch account.accountType {
+        case .remote:
+            return try await remoteService.send(text: content, account: account, conversationID: thread.id)
+        case .localDevice, .localICloud:
+            // Placeholder local echo until local models are wired.
+            try await Task.sleep(nanoseconds: 400_000_000)
+            return ChatMessage(role: .assistant, content: "(local) \(content)")
+        }
     }
 }

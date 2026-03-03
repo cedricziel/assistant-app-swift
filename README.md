@@ -17,10 +17,13 @@ assistant-app-swift/
 ├── Configurations/            # Per-platform Info.plist templates
 ├── project.yml                # XcodeGen manifest
 ├── Resources/Shared/          # Asset catalogs shared across targets
-└── Sources/Shared/            # SwiftUI views, models, and stores
+├── Sources/Shared/            # SwiftUI views, models, and stores
+└── docs/                      # Architecture notes (e.g., account model diagram)
 ```
 
 Shared state lives in `AccountStore` and `ChatStore`. `AccountStore` owns authentication state, while `ChatStore` keeps per-account threads and routes outgoing messages through a `ChatService`. The current `ChatService` simply echoes text back; swap it out with real calls into the [`cedricziel/assistant`](https://github.com/cedricziel/assistant) backend when it is ready.
+
+For a high-level view of the desired remote vs. local account types (including iCloud support), see [`docs/account-model.md`](docs/account-model.md).
 
 ## Bootstrapping
 
@@ -35,11 +38,32 @@ Shared state lives in `AccountStore` and `ChatStore`. `AccountStore` owns authen
 
 Whenever you edit `project.yml`, re-run `xcodegen generate` to refresh the Xcode project.
 
+## Pre-commit formatting and linting
+
+This repository includes:
+
+- `opencode.json` formatter rules for Swift and Markdown files.
+- `.husky/pre-commit` checks that run before each commit on staged files:
+  - Swift: `swiftformat` + `swiftformat --lint`
+  - Markdown (`.md`, `.mdx`, `.markdown`): `prettier --write` + `prettier --check`
+
+To enable the repository hook path once per clone:
+
+```sh
+git config core.hooksPath .husky
+```
+
+Required tooling:
+
+- `swiftformat` (for `.swift` checks)
+- one of `bunx`, `npx`, or global `prettier` (for Markdown checks)
+
 ## Talking to your servers
 
 - On first launch you will land on the login screen. Enter the base URL of your running [`cedricziel/assistant`](https://github.com/cedricziel/assistant) instance (for example, `https://localhost:3000`), give the profile a friendly display name, and paste the API token issued by the server.
 - Each account remembers the server that issued it, so you can add as many as you need. Use the sidebar (or the account toolbar button) to switch between them.
 - The macOS menu bar extra mirrors the most recent thread so you can send a quick reply without revealing the full window.
+- Remote accounts call the assistant's A2A HTTP interface (`/message/send`) with a Bearer token, so any deployment exposing the [web UI endpoints](https://github.com/cedricziel/assistant/blob/main/docs/web-ui.md) automatically works with the native client.
 
 **Note:** The placeholder `ChatService` only echoes user input. Wire it up to your backend by swapping in a real networking implementation that calls into [`cedricziel/assistant`](https://github.com/cedricziel/assistant) and updates `ChatStore` with streamed responses.
 

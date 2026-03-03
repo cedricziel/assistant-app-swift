@@ -7,6 +7,7 @@ struct AssistantAccount: Identifiable, Hashable, Codable {
     var server: ServerEnvironment
     var apiToken: String
     var createdAt: Date
+    var accountType: AccountType
 
     init(
         id: UUID = UUID(),
@@ -14,7 +15,8 @@ struct AssistantAccount: Identifiable, Hashable, Codable {
         userHandle: String,
         apiToken: String,
         server: ServerEnvironment,
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        accountType: AccountType = .remote
     ) {
         self.id = id
         self.displayName = displayName
@@ -22,11 +24,24 @@ struct AssistantAccount: Identifiable, Hashable, Codable {
         self.apiToken = apiToken
         self.server = server
         self.createdAt = createdAt
+        self.accountType = accountType
     }
 
     var redactedToken: String {
         let suffix = apiToken.suffix(4)
         return "•••\(suffix)"
+    }
+}
+
+extension AssistantAccount {
+    enum AccountType: String, Codable {
+        case remote
+        case localDevice
+        case localICloud
+
+        var supportsRemoteTransport: Bool {
+            self == .remote
+        }
     }
 }
 
