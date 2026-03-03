@@ -9,6 +9,8 @@ struct AssistantAccount: Identifiable, Hashable, Codable {
     var createdAt: Date
     var accountType: AccountType
     var remoteProvider: RemoteProvider
+    var remoteAuthMode: RemoteAuthMode
+    var openAIAccountID: String?
 
     init(
         id: UUID = UUID(),
@@ -19,6 +21,8 @@ struct AssistantAccount: Identifiable, Hashable, Codable {
         createdAt: Date = .now,
         accountType: AccountType = .remote,
         remoteProvider: RemoteProvider = .assistantBackend,
+        remoteAuthMode: RemoteAuthMode = .apiKey,
+        openAIAccountID: String? = nil,
     ) {
         self.id = id
         self.displayName = displayName
@@ -28,6 +32,8 @@ struct AssistantAccount: Identifiable, Hashable, Codable {
         self.createdAt = createdAt
         self.accountType = accountType
         self.remoteProvider = remoteProvider
+        self.remoteAuthMode = remoteAuthMode
+        self.openAIAccountID = openAIAccountID
     }
 
     var redactedToken: String {
@@ -41,6 +47,11 @@ extension AssistantAccount {
         case assistantBackend
         case openAI
     }
+
+    enum RemoteAuthMode: String, Codable {
+        case apiKey
+        case chatGPTSubscription
+    }
 }
 
 extension AssistantAccount {
@@ -53,6 +64,8 @@ extension AssistantAccount {
         case createdAt
         case accountType
         case remoteProvider
+        case remoteAuthMode
+        case openAIAccountID
     }
 
     init(from decoder: Decoder) throws {
@@ -66,6 +79,8 @@ extension AssistantAccount {
         accountType = try container.decodeIfPresent(AccountType.self, forKey: .accountType) ?? .remote
         remoteProvider = try container
             .decodeIfPresent(RemoteProvider.self, forKey: .remoteProvider) ?? .assistantBackend
+        remoteAuthMode = try container.decodeIfPresent(RemoteAuthMode.self, forKey: .remoteAuthMode) ?? .apiKey
+        openAIAccountID = try container.decodeIfPresent(String.self, forKey: .openAIAccountID)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -77,6 +92,8 @@ extension AssistantAccount {
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(accountType, forKey: .accountType)
         try container.encode(remoteProvider, forKey: .remoteProvider)
+        try container.encode(remoteAuthMode, forKey: .remoteAuthMode)
+        try container.encodeIfPresent(openAIAccountID, forKey: .openAIAccountID)
     }
 }
 

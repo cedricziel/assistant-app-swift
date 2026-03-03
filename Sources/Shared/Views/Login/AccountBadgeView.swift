@@ -42,7 +42,7 @@ struct AccountBadgeView: View {
         case .assistantBackend:
             "Assistant"
         case .openAI:
-            "OpenAI"
+            account.remoteAuthMode == .chatGPTSubscription ? "OpenAI Sub" : "OpenAI"
         }
         return "\(providerName) \(account.redactedToken)"
     }

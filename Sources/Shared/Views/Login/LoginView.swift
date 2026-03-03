@@ -1,4 +1,9 @@
 import SwiftUI
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 struct LoginView: View {
     enum Mode {
@@ -25,6 +30,7 @@ struct LoginView: View {
     @State private var apiToken: String = ""
     @State private var accountType: AssistantAccount.AccountType = .remote
     @State private var remoteProvider: AssistantAccount.RemoteProvider = .assistantBackend
+    @State private var remoteAuthMode: AssistantAccount.RemoteAuthMode = .apiKey
     @FocusState private var focusedField: Field?
 
     enum Field {
@@ -61,6 +67,15 @@ struct LoginView: View {
                         }
                     }
 
+                    if remoteProvider == .openAI {
+                        Section("Authentication") {
+                            Picker("Mode", selection: $remoteAuthMode) {
+                                Text("API key").tag(AssistantAccount.RemoteAuthMode.apiKey)
+                                Text("ChatGPT Plus/Pro").tag(AssistantAccount.RemoteAuthMode.chatGPTSubscription)
+                            }
+                        }
+                    }
+
                     if remoteProvider == .assistantBackend {
                         Section("Server") {
                             Group {
@@ -77,17 +92,34 @@ struct LoginView: View {
                         }
                     }
 
-                    Section("Credentials") {
-                        Group {
-                            #if os(iOS)
-                            SecureField(tokenPlaceholder, text: $apiToken)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                            #else
-                            SecureField(tokenPlaceholder, text: $apiToken)
-                            #endif
+                    if requiresManualCredential {
+                        Section("Credentials") {
+                            Group {
+                                #if os(iOS)
+                                SecureField(tokenPlaceholder, text: $apiToken)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                                #else
+                                SecureField(tokenPlaceholder, text: $apiToken)
+                                #endif
+                            }
+                            .focused($focusedField, equals: .token)
                         }
-                        .focused($focusedField, equals: .token)
+                    }
+
+                    if let pending = accountStore.pendingOpenAIAuthorization {
+                        Section("Authorization") {
+                            Text(pending.instructions)
+                                .foregroundStyle(.secondary)
+                            Text("Code: \(pending.userCode)")
+                                .font(.body.monospaced().bold())
+                            Button("Copy Code") {
+                                copyToClipboard(pending.userCode)
+                            }
+                            Button("Open ChatGPT Authorization") {
+                                open(url: pending.verificationURL)
+                            }
+                        }
                     }
                 }
 
@@ -144,10 +176,17 @@ struct LoginView: View {
         .onChange(of: accountType) { _, newValue in
             if newValue != .remote {
                 remoteProvider = .assistantBackend
+                remoteAuthMode = .apiKey
             }
             focusedField = initialFocusedField
         }
         .onChange(of: remoteProvider) { _, _ in
+            if remoteProvider != .openAI {
+                remoteAuthMode = .apiKey
+            }
+            focusedField = initialFocusedField
+        }
+        .onChange(of: remoteAuthMode) { _, _ in
             focusedField = initialFocusedField
         }
     }
@@ -159,7 +198,11 @@ struct LoginView: View {
             case .assistantBackend:
                 "Sign in with a server and token to continue."
             case .openAI:
-                "Connect OpenAI with an API key to send messages directly."
+                if remoteAuthMode == .chatGPTSubscription {
+                    "Connect your ChatGPT Plus/Pro subscription to use Codex models."
+                } else {
+                    "Connect OpenAI with an API key to send messages directly."
+                }
             }
         case .localDevice, .localICloud:
             "Create a local profile to keep conversations on your devices."
@@ -184,6 +227,10 @@ struct LoginView: View {
             return .server
         }
 
+        if remoteProvider == .openAI, remoteAuthMode == .chatGPTSubscription {
+            return .name
+        }
+
         return .token
     }
 
@@ -195,6 +242,7 @@ struct LoginView: View {
                 displayName: displayName,
                 accountType: accountType,
                 remoteProvider: remoteProvider,
+                remoteAuthMode: remoteAuthMode,
             )
             if let account = accountStore.activeAccount {
                 _ = chatStore.ensureDefaultThread(for: account)
@@ -206,10 +254,42 @@ struct LoginView: View {
         switch accountType {
         case .remote:
             let missingServer = remoteProvider == .assistantBackend && serverAddress.isBlank
-            return apiToken.isBlank || missingServer
+            let missingCredential = requiresManualCredential && apiToken.isBlank
+            return missingCredential || missingServer
         case .localDevice, .localICloud:
             return false
         }
+    }
+}
+
+private extension LoginView {
+    var requiresManualCredential: Bool {
+        guard accountType == .remote else {
+            return false
+        }
+
+        if remoteProvider == .openAI, remoteAuthMode == .chatGPTSubscription {
+            return false
+        }
+
+        return true
+    }
+
+    func open(url: URL) {
+        #if os(iOS)
+        UIApplication.shared.open(url)
+        #elseif os(macOS)
+        NSWorkspace.shared.open(url)
+        #endif
+    }
+
+    func copyToClipboard(_ value: String) {
+        #if os(iOS)
+        UIPasteboard.general.string = value
+        #elseif os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(value, forType: .string)
+        #endif
     }
 }
 

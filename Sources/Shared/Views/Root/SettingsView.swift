@@ -56,9 +56,15 @@ struct SettingsView: View {
     private func remoteProviderDescription(for account: AssistantAccount) -> String {
         switch account.remoteProvider {
         case .assistantBackend:
-            "Provider: Assistant backend"
+            return "Provider: Assistant backend"
         case .openAI:
-            "Provider: OpenAI"
+            let mode = switch account.remoteAuthMode {
+            case .apiKey:
+                "API key"
+            case .chatGPTSubscription:
+                "ChatGPT Plus/Pro"
+            }
+            return "Provider: OpenAI (\(mode))"
         }
     }
 }

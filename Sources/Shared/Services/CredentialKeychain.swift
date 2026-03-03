@@ -22,13 +22,13 @@ struct CredentialKeychain {
         self.service = service
     }
 
-    func setToken(_ token: String, for accountID: UUID) throws {
+    func setData(_ data: Data, for accountID: UUID) throws {
         let accountKey = accountKey(for: accountID)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: accountKey,
-            kSecValueData as String: Data(token.utf8),
+            kSecValueData as String: data,
         ]
 
         SecItemDelete(query as CFDictionary)
@@ -38,7 +38,7 @@ struct CredentialKeychain {
         }
     }
 
-    func token(for accountID: UUID) throws -> String? {
+    func data(for accountID: UUID) throws -> Data? {
         let accountKey = accountKey(for: accountID)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -56,7 +56,21 @@ struct CredentialKeychain {
         guard status == errSecSuccess else {
             throw KeychainError.unexpectedStatus(status)
         }
-        guard let data = item as? Data, let token = String(data: data, encoding: .utf8) else {
+        guard let data = item as? Data else {
+            throw KeychainError.invalidData
+        }
+        return data
+    }
+
+    func setToken(_ token: String, for accountID: UUID) throws {
+        try setData(Data(token.utf8), for: accountID)
+    }
+
+    func token(for accountID: UUID) throws -> String? {
+        guard let data = try data(for: accountID) else {
+            return nil
+        }
+        guard let token = String(data: data, encoding: .utf8) else {
             throw KeychainError.invalidData
         }
         return token

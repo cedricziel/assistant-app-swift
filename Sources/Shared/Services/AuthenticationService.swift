@@ -7,6 +7,12 @@ struct AuthenticationService {
         let url: String
     }
 
+    private struct RemoteConfiguration {
+        let provider: AssistantAccount.RemoteProvider
+        let authMode: AssistantAccount.RemoteAuthMode
+        let accountID: String?
+    }
+
     enum AuthenticationError: LocalizedError {
         case invalidServerAddress
         case missingCredentials
@@ -27,6 +33,8 @@ struct AuthenticationService {
         displayName: String,
         accountType: AssistantAccount.AccountType,
         remoteProvider: AssistantAccount.RemoteProvider = .assistantBackend,
+        remoteAuthMode: AssistantAccount.RemoteAuthMode = .apiKey,
+        openAIAccountID: String? = nil,
     ) async throws -> AssistantAccount {
         try await Task.sleep(nanoseconds: 250_000_000)
 
@@ -35,12 +43,17 @@ struct AuthenticationService {
 
         switch accountType {
         case .remote:
+            let configuration = RemoteConfiguration(
+                provider: remoteProvider,
+                authMode: remoteAuthMode,
+                accountID: openAIAccountID,
+            )
             return try makeRemoteAccount(
                 serverAddress: serverAddress,
                 apiToken: apiToken,
                 normalizedDisplayName: normalizedDisplayName,
                 userHandle: userHandle,
-                remoteProvider: remoteProvider,
+                configuration: configuration,
             )
 
         case .localDevice:
@@ -64,14 +77,14 @@ struct AuthenticationService {
         apiToken: String,
         normalizedDisplayName: String,
         userHandle: String,
-        remoteProvider: AssistantAccount.RemoteProvider,
+        configuration: RemoteConfiguration,
     ) throws -> AssistantAccount {
         guard !apiToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw AuthenticationError.missingCredentials
         }
 
         let environment: ServerEnvironment
-        switch remoteProvider {
+        switch configuration.provider {
         case .assistantBackend:
             guard let url = URL(string: serverAddress.trimmingCharacters(in: .whitespacesAndNewlines)) else {
                 throw AuthenticationError.invalidServerAddress
@@ -91,7 +104,9 @@ struct AuthenticationService {
             apiToken: apiToken,
             server: environment,
             accountType: .remote,
-            remoteProvider: remoteProvider,
+            remoteProvider: configuration.provider,
+            remoteAuthMode: configuration.authMode,
+            openAIAccountID: configuration.accountID,
         )
     }
 
