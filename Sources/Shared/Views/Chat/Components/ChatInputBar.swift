@@ -10,7 +10,7 @@ struct ChatInputBar: View {
         HStack(alignment: .bottom, spacing: 12) {
             TextField(placeholder, text: $text, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
-                .lineLimit(1...6)
+                .lineLimit(1 ... 6)
                 .disabled(isSending)
                 .onSubmit { submit() }
             Button(action: submit) {

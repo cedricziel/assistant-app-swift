@@ -12,7 +12,7 @@ final class AccountStore: ObservableObject {
     init(accounts: [AssistantAccount] = [], authenticationService: AuthenticationService = AuthenticationService()) {
         self.accounts = accounts
         self.authenticationService = authenticationService
-        self.activeAccountID = accounts.first?.id
+        activeAccountID = accounts.first?.id
     }
 
     var activeAccount: AssistantAccount? {

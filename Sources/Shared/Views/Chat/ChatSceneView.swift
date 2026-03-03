@@ -59,7 +59,8 @@ struct ChatSceneView: View {
         } detail: {
             if let account = accountStore.activeAccount,
                let threadID = selectedThreadID,
-               let thread = chatStore.thread(with: threadID, for: account) {
+               let thread = chatStore.thread(with: threadID, for: account)
+            {
                 ChatView(account: account, thread: thread)
             } else if accountStore.activeAccount != nil {
                 ContentUnavailableView("Choose a conversation", systemImage: "ellipsis.bubble", description: Text("Select or start a thread from the list."))
@@ -71,7 +72,7 @@ struct ChatSceneView: View {
         .onChange(of: accountStore.activeAccountID) { _ in
             selectDefaultThread()
         }
-#if os(iOS)
+        #if os(iOS)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
@@ -81,7 +82,7 @@ struct ChatSceneView: View {
                 }
             }
         }
-#endif
+        #endif
     }
 
     private func selectDefaultThread() {

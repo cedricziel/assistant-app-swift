@@ -11,20 +11,20 @@ struct AssistantApp: App {
                 .environmentObject(session.chatStore)
         }
         #if os(macOS)
-        MenuBarExtra("Assistant", systemImage: "message.fill") {
-            MenuBarContentView()
-                .environmentObject(session.accountStore)
-                .environmentObject(session.chatStore)
-                .frame(width: 340, height: 420)
-                .padding(.vertical)
-        }
-        .menuBarExtraStyle(.window)
+            MenuBarExtra("Assistant", systemImage: "message.fill") {
+                MenuBarContentView()
+                    .environmentObject(session.accountStore)
+                    .environmentObject(session.chatStore)
+                    .frame(width: 340, height: 420)
+                    .padding(.vertical)
+            }
+            .menuBarExtraStyle(.window)
         #endif
         #if os(macOS)
-        Settings {
-            SettingsView()
-                .environmentObject(session.accountStore)
-        }
+            Settings {
+                SettingsView()
+                    .environmentObject(session.accountStore)
+            }
         #endif
     }
 }

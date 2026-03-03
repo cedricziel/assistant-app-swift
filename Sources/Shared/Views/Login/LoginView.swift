@@ -45,37 +45,37 @@ struct LoginView: View {
             Form {
                 Section("Server") {
                     Group {
-#if os(iOS)
-                        TextField("https://assistant.local", text: $serverAddress)
-                            .keyboardType(.URL)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-#else
-                        TextField("https://assistant.local", text: $serverAddress)
-#endif
+                        #if os(iOS)
+                            TextField("https://assistant.local", text: $serverAddress)
+                                .keyboardType(.URL)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                        #else
+                            TextField("https://assistant.local", text: $serverAddress)
+                        #endif
                     }
                     .focused($focusedField, equals: .server)
                 }
 
                 Section("Profile") {
                     Group {
-#if os(iOS)
-                        TextField("Display name", text: $displayName)
-                            .textInputAutocapitalization(.words)
-#else
-                        TextField("Display name", text: $displayName)
-#endif
+                        #if os(iOS)
+                            TextField("Display name", text: $displayName)
+                                .textInputAutocapitalization(.words)
+                        #else
+                            TextField("Display name", text: $displayName)
+                        #endif
                     }
                     .focused($focusedField, equals: .name)
 
                     Group {
-#if os(iOS)
-                        SecureField("API token", text: $apiToken)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-#else
-                        SecureField("API token", text: $apiToken)
-#endif
+                        #if os(iOS)
+                            SecureField("API token", text: $apiToken)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                        #else
+                            SecureField("API token", text: $apiToken)
+                        #endif
                     }
                     .focused($focusedField, equals: .token)
                 }

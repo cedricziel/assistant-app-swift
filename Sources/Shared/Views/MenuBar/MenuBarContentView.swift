@@ -8,7 +8,8 @@ struct MenuBarContentView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if let account = accountStore.activeAccount,
-               let thread = chatStore.latestThread(for: account) {
+               let thread = chatStore.latestThread(for: account)
+            {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(account.displayName)
                         .font(.headline)

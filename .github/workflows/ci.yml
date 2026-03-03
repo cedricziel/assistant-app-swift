@@ -21,6 +21,12 @@ jobs:
       - name: Install SwiftFormat
         run: brew install swiftformat
 
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
       - name: Lint Swift formatting
         run: swiftformat --lint Sources/Shared
 
@@ -40,6 +46,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
 
       - name: Build iOS app (Simulator)
         run: >-

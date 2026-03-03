@@ -1,3 +1,4 @@
+import MarkdownUI
 import SwiftUI
 
 struct MessageBubbleView: View {
@@ -26,12 +27,36 @@ struct MessageBubbleView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Text(message.content)
-                .font(.body)
+            Markdown(message.content)
+                .markdownTheme(messageMarkdownTheme)
         }
         .padding(12)
         .background(bubbleBackground)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private var messageMarkdownTheme: Theme {
+        let textColor: Color = message.isFromCurrentUser ? .white : .primary
+
+        return Theme()
+            .text {
+                FontFamilyVariant(.system(.body))
+                ForegroundColor(textColor)
+            }
+            .strong {
+                FontWeight(.semibold)
+                ForegroundColor(textColor)
+            }
+            .emphasis {
+                FontStyle(.italic)
+                ForegroundColor(textColor)
+            }
+            .code {
+                FontFamilyVariant(.monospaced)
+                FontSize(.em(0.92))
+                BackgroundColor(.black.opacity(message.isFromCurrentUser ? 0.18 : 0.08))
+                ForegroundColor(textColor)
+            }
     }
 
     private var bubbleBackground: some ShapeStyle {
