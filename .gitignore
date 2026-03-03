@@ -2,3 +2,4 @@
 DerivedData/
 Assistant.xcodeproj/
 xcuserdata/
+.build/

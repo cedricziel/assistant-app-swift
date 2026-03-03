@@ -22,9 +22,8 @@ settings:
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     ENABLE_STRING_CATALOG_SYMBOL_GENERATION: YES
 packages:
-  MarkdownUI:
-    url: https://github.com/gonzalezreal/swift-markdown-ui
-    from: 2.4.1
+  AssistantShared:
+    path: AssistantShared
 targets:
   Assistant iOS:
     type: application
@@ -34,7 +33,7 @@ targets:
     resources:
       - path: Resources/Shared
     dependencies:
-      - package: MarkdownUI
+      - package: AssistantShared
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.assistant.ios
@@ -71,7 +70,7 @@ targets:
     resources:
       - path: Resources/Shared
     dependencies:
-      - package: MarkdownUI
+      - package: AssistantShared
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.assistant.macos

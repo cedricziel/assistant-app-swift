@@ -1,4 +1,4 @@
-import MarkdownUI
+import AssistantShared
 import SwiftUI
 
 struct MessageBubbleView: View {
