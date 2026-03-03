@@ -24,6 +24,7 @@ struct AssistantApp: App {
             Settings {
                 SettingsView()
                     .environmentObject(session.accountStore)
+                    .environmentObject(session.chatStore)
             }
         #endif
     }

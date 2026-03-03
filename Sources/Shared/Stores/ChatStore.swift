@@ -4,24 +4,34 @@ import Foundation
 final class ChatStore: ObservableObject {
     @Published private var threadsByAccount: [AssistantAccount.ID: [ChatThread]] = [:]
     @Published private var pendingThreadIDs: Set<ChatThread.ID> = []
+    @Published var persistenceError: String?
 
     private let chatService: ChatService
+    private let threadPersistence: ChatThreadPersisting
+    private var hydratedAccountIDs: Set<AssistantAccount.ID> = []
 
-    init(chatService: ChatService = ChatService()) {
+    init(
+        chatService: ChatService = ChatService(),
+        threadPersistence: ChatThreadPersisting = ChatThreadPersistence()
+    ) {
         self.chatService = chatService
+        self.threadPersistence = threadPersistence
     }
 
     func threads(for account: AssistantAccount) -> [ChatThread] {
-        threadsByAccount[account.id] ?? []
+        hydrateThreadsIfNeeded(for: account)
+        return threadsByAccount[account.id] ?? []
     }
 
     func ensureDefaultThread(for account: AssistantAccount) -> ChatThread {
+        hydrateThreadsIfNeeded(for: account)
         if let existing = threads(for: account).first {
             return existing
         }
         let greeting = ChatMessage.system("Connected to \(account.server.displayName)")
         let thread = ChatThread(title: "New chat", messages: [greeting])
         threadsByAccount[account.id] = [thread]
+        persistThreads(for: account)
         return thread
     }
 
@@ -30,10 +40,12 @@ final class ChatStore: ObservableObject {
     }
 
     func createThread(for account: AssistantAccount) -> ChatThread {
+        hydrateThreadsIfNeeded(for: account)
         let thread = ChatThread(title: "New chat")
         var threads = threads(for: account)
         threads.insert(thread, at: 0)
         threadsByAccount[account.id] = threads
+        persistThreads(for: account)
         return thread
     }
 
@@ -76,6 +88,7 @@ final class ChatStore: ObservableObject {
     }
 
     private func upsert(_ thread: ChatThread, for account: AssistantAccount) {
+        hydrateThreadsIfNeeded(for: account)
         var threads = threads(for: account)
         if let index = threads.firstIndex(where: { $0.id == thread.id }) {
             threads[index] = thread
@@ -83,5 +96,40 @@ final class ChatStore: ObservableObject {
             threads.insert(thread, at: 0)
         }
         threadsByAccount[account.id] = threads
+        persistThreads(for: account)
+    }
+
+    func removeData(for account: AssistantAccount) {
+        threadsByAccount[account.id] = nil
+        hydratedAccountIDs.remove(account.id)
+        do {
+            try threadPersistence.removeThreads(for: account)
+            persistenceError = nil
+        } catch {
+            persistenceError = error.localizedDescription
+        }
+    }
+
+    private func hydrateThreadsIfNeeded(for account: AssistantAccount) {
+        guard !hydratedAccountIDs.contains(account.id) else { return }
+        hydratedAccountIDs.insert(account.id)
+        do {
+            threadsByAccount[account.id] = try threadPersistence.loadThreads(for: account)
+            persistenceError = nil
+        } catch {
+            threadsByAccount[account.id] = []
+            persistenceError = error.localizedDescription
+        }
+    }
+
+    private func persistThreads(for account: AssistantAccount) {
+        guard account.conversationStorage.persistsLocally else { return }
+        let threads = threadsByAccount[account.id] ?? []
+        do {
+            try threadPersistence.saveThreads(threads, for: account)
+            persistenceError = nil
+        } catch {
+            persistenceError = error.localizedDescription
+        }
     }
 }

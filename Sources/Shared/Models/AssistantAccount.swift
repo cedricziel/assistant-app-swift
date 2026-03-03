@@ -42,6 +42,31 @@ extension AssistantAccount {
         var supportsRemoteTransport: Bool {
             self == .remote
         }
+
+        var conversationStorage: ConversationStorage {
+            switch self {
+            case .remote:
+                return .remoteBackend
+            case .localDevice:
+                return .deviceOnly
+            case .localICloud:
+                return .iCloud
+            }
+        }
+    }
+
+    enum ConversationStorage: String, Codable {
+        case remoteBackend
+        case deviceOnly
+        case iCloud
+
+        var persistsLocally: Bool {
+            self == .deviceOnly || self == .iCloud
+        }
+    }
+
+    var conversationStorage: ConversationStorage {
+        accountType.conversationStorage
     }
 }
 

@@ -23,6 +23,7 @@ struct LoginView: View {
     @State private var serverAddress: String = "https://assistant.local"
     @State private var displayName: String = ""
     @State private var apiToken: String = ""
+    @State private var accountType: AssistantAccount.AccountType = .remote
     @FocusState private var focusedField: Field?
 
     enum Field {
@@ -43,18 +44,28 @@ struct LoginView: View {
             .padding(.horizontal)
 
             Form {
-                Section("Server") {
-                    Group {
-                        #if os(iOS)
-                            TextField("https://assistant.local", text: $serverAddress)
-                                .keyboardType(.URL)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                        #else
-                            TextField("https://assistant.local", text: $serverAddress)
-                        #endif
+                Section("Account") {
+                    Picker("Storage", selection: $accountType) {
+                        Text("Remote backend").tag(AssistantAccount.AccountType.remote)
+                        Text("On this device").tag(AssistantAccount.AccountType.localDevice)
+                        Text("iCloud sync").tag(AssistantAccount.AccountType.localICloud)
                     }
-                    .focused($focusedField, equals: .server)
+                }
+
+                if accountType == .remote {
+                    Section("Server") {
+                        Group {
+                            #if os(iOS)
+                                TextField("https://assistant.local", text: $serverAddress)
+                                    .keyboardType(.URL)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                            #else
+                                TextField("https://assistant.local", text: $serverAddress)
+                            #endif
+                        }
+                        .focused($focusedField, equals: .server)
+                    }
                 }
 
                 Section("Profile") {
@@ -68,16 +79,18 @@ struct LoginView: View {
                     }
                     .focused($focusedField, equals: .name)
 
-                    Group {
-                        #if os(iOS)
-                            SecureField("API token", text: $apiToken)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                        #else
-                            SecureField("API token", text: $apiToken)
-                        #endif
+                    if accountType == .remote {
+                        Group {
+                            #if os(iOS)
+                                SecureField("API token", text: $apiToken)
+                                    .textInputAutocapitalization(.never)
+                                    .autocorrectionDisabled()
+                            #else
+                                SecureField("API token", text: $apiToken)
+                            #endif
+                        }
+                        .focused($focusedField, equals: .token)
                     }
-                    .focused($focusedField, equals: .token)
                 }
 
                 Section {
@@ -91,7 +104,7 @@ struct LoginView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(apiToken.isBlank || serverAddress.isBlank)
+                    .disabled(isConnectDisabled)
 
                     if let error = accountStore.authenticationError {
                         Text(error)
@@ -125,11 +138,21 @@ struct LoginView: View {
             await accountStore.login(
                 serverAddress: serverAddress,
                 apiToken: apiToken,
-                displayName: displayName
+                displayName: displayName,
+                accountType: accountType
             )
             if let account = accountStore.activeAccount {
                 _ = chatStore.ensureDefaultThread(for: account)
             }
+        }
+    }
+
+    private var isConnectDisabled: Bool {
+        switch accountType {
+        case .remote:
+            return apiToken.isBlank || serverAddress.isBlank
+        case .localDevice, .localICloud:
+            return false
         }
     }
 }

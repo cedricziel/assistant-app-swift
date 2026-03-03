@@ -13,11 +13,28 @@ struct AccountBadgeView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            Text(account.redactedToken)
-                .font(.footnote.monospaced())
-                .foregroundStyle(.secondary)
+            if account.accountType == .remote {
+                Text(account.redactedToken)
+                    .font(.footnote.monospaced())
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(storageLabel)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(.vertical, 4)
+    }
+
+    private var storageLabel: String {
+        switch account.conversationStorage {
+        case .remoteBackend:
+            return "Remote"
+        case .deviceOnly:
+            return "Device"
+        case .iCloud:
+            return "iCloud"
+        }
     }
 }
 
