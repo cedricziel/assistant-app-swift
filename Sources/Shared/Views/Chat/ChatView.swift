@@ -6,6 +6,7 @@ struct ChatView: View {
 
     @EnvironmentObject private var chatStore: ChatStore
     @State private var composerText = ""
+    @State private var isShowingTrace = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,6 +30,22 @@ struct ChatView: View {
                 }
             }
             Divider()
+            if !traceEvents.isEmpty {
+                DisclosureGroup("Agent loop trace", isExpanded: $isShowingTrace) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(traceEvents) { event in
+                            Text("[\(event.attempt)] \(event.phase.rawValue): \(event.detail)")
+                                .font(.caption.monospaced())
+                                .foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .padding(.top, 4)
+                }
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+            }
+            Divider()
             ChatInputBar(
                 text: $composerText,
                 isSending: chatStore.isSending(threadID: thread.id),
@@ -39,6 +56,10 @@ struct ChatView: View {
             .padding()
         }
         .navigationTitle(thread.title)
+    }
+
+    private var traceEvents: [AgentLoop.TraceEvent] {
+        chatStore.latestLoopTrace(for: thread.id)
     }
 
     private func send(_ text: String) {

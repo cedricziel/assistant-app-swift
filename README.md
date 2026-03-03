@@ -21,7 +21,7 @@ assistant-app-swift/
 └── docs/                      # Architecture notes (e.g., account model diagram)
 ```
 
-Shared state lives in `AccountStore` and `ChatStore`. `AccountStore` owns authentication state, while `ChatStore` keeps per-account threads and routes outgoing messages through a `ChatService`. The current `ChatService` simply echoes text back; swap it out with real calls into the [`cedricziel/assistant`](https://github.com/cedricziel/assistant) backend when it is ready.
+Shared state lives in `AccountStore` and `ChatStore`. `AccountStore` owns authentication state, while `ChatStore` keeps per-account threads and routes outgoing messages through a `ChatService`. `ChatService` now runs a shared agent loop that routes each turn to either local or remote assistant services based on account type.
 
 For a high-level view of the desired remote vs. local account types (including iCloud support), see [`docs/account-model.md`](docs/account-model.md).
 
@@ -65,7 +65,7 @@ Required tooling:
 - The macOS menu bar extra mirrors the most recent thread so you can send a quick reply without revealing the full window.
 - Remote accounts call the assistant's A2A HTTP interface (`/message/send`) with a Bearer token, so any deployment exposing the [web UI endpoints](https://github.com/cedricziel/assistant/blob/main/docs/web-ui.md) automatically works with the native client.
 
-**Note:** The placeholder `ChatService` only echoes user input. Wire it up to your backend by swapping in a real networking implementation that calls into [`cedricziel/assistant`](https://github.com/cedricziel/assistant) and updates `ChatStore` with streamed responses.
+**Note:** Remote accounts already call the backend through `RemoteAssistantService`. Local account types currently use a placeholder local assistant implementation that echoes input; swap in your on-device model runtime when ready.
 
 ## Next steps
 

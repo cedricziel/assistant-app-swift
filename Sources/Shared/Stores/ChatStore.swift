@@ -4,6 +4,7 @@ import Foundation
 final class ChatStore: ObservableObject {
     @Published private var threadsByAccount: [AssistantAccount.ID: [ChatThread]] = [:]
     @Published private var pendingThreadIDs: Set<ChatThread.ID> = []
+    @Published private var loopTraceByThreadID: [ChatThread.ID: [AgentLoop.TraceEvent]] = [:]
     @Published var persistenceError: String?
 
     private let chatService: ChatService
@@ -57,6 +58,10 @@ final class ChatStore: ObservableObject {
         pendingThreadIDs.contains(threadID)
     }
 
+    func latestLoopTrace(for threadID: ChatThread.ID) -> [AgentLoop.TraceEvent] {
+        loopTraceByThreadID[threadID] ?? []
+    }
+
     func send(message: String, for account: AssistantAccount) async {
         let thread = latestThread(for: account) ?? ensureDefaultThread(for: account)
         await send(message: message, in: thread.id, for: account)
@@ -76,14 +81,18 @@ final class ChatStore: ObservableObject {
         defer { pendingThreadIDs.remove(threadID) }
 
         do {
-            let response = try await chatService.sendMessage(trimmed, for: account, in: currentThread)
+            let output = try await chatService.sendMessage(trimmed, for: account, in: currentThread)
             var refreshed = thread(with: threadID, for: account) ?? currentThread
-            refreshed = refreshed.appending(response)
+            refreshed = refreshed.appending(output.message)
             upsert(refreshed, for: account)
+            loopTraceByThreadID[threadID] = output.trace
         } catch {
             var refreshed = thread(with: threadID, for: account) ?? currentThread
             refreshed = refreshed.appending(ChatMessage.system(error.localizedDescription))
             upsert(refreshed, for: account)
+            if let runError = error as? AgentLoop.RunError {
+                loopTraceByThreadID[threadID] = runError.trace
+            }
         }
     }
 
@@ -100,6 +109,10 @@ final class ChatStore: ObservableObject {
     }
 
     func removeData(for account: AssistantAccount) {
+        let threadIDs = Set((threadsByAccount[account.id] ?? []).map(\.id))
+        for threadID in threadIDs {
+            loopTraceByThreadID[threadID] = nil
+        }
         threadsByAccount[account.id] = nil
         hydratedAccountIDs.remove(account.id)
         do {
