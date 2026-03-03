@@ -131,6 +131,17 @@ prettier --check <file>.md
 - Match file names to primary types (`ChatStore.swift`, `LoginView.swift`).
 - Keep domain-oriented folders (`App`, `Models`, `Services`, `Stores`, `Support`, `Views`).
 
+### Testing approach
+
+- Use TDD where practical: write or update a failing test first, implement the smallest code change to pass, then refactor.
+- When tests are not yet feasible (for example missing test target or UI-only spikes), call this out explicitly in PR/commit notes.
+
+### Architecture
+
+- Use MVVM for new views going forward.
+- Keep view models responsible for presentation/business logic and state transitions.
+- Keep SwiftUI views focused on rendering and user interactions.
+
 ### Naming conventions
 
 - Types/protocols/enums: UpperCamelCase.
@@ -170,6 +181,7 @@ prettier --check <file>.md
 - Use `@EnvironmentObject` for shared app stores.
 - Use local `@State` for view-local ephemeral state.
 - Keep business logic in stores/services rather than view bodies.
+- Build small, reusable SwiftUI components and compose larger screens from those components.
 - Use `#if os(iOS)` / `#if os(macOS)` to preserve platform behavior.
 - Include `#Preview` blocks for key screens/components.
 
