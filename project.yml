@@ -10,7 +10,7 @@ configs:
   Release: release
 settings:
   base:
-    DEVELOPMENT_TEAM: ''
+    DEVELOPMENT_TEAM: WPW3QSLZ2F
     SWIFT_VERSION: 6.2
     CURRENT_PROJECT_VERSION: 1
     MARKETING_VERSION: 0.1.0
