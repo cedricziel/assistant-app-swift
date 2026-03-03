@@ -11,15 +11,15 @@ struct RemoteAssistantService {
         var errorDescription: String? {
             switch self {
             case .unsupportedAccount:
-                return "The selected account does not support remote messaging."
+                "The selected account does not support remote messaging."
             case .invalidURL:
-                return "The assistant server URL is invalid."
+                "The assistant server URL is invalid."
             case let .httpError(code):
-                return "Assistant server responded with status code \(code)."
+                "Assistant server responded with status code \(code)."
             case .emptyBody:
-                return "Assistant server returned an empty response."
+                "Assistant server returned an empty response."
             case .missingMessage:
-                return "Assistant server response did not include a message."
+                "Assistant server response did not include a message."
             }
         }
     }
@@ -37,9 +37,9 @@ struct RemoteAssistantService {
     func send(
         text: String,
         account: AssistantAccount,
-        conversationID: UUID
+        conversationID: UUID,
     ) async throws -> ChatMessage {
-        guard account.accountType.supportsRemoteTransport else {
+        guard account.accountType.supportsRemoteTransport, account.remoteProvider == .assistantBackend else {
             throw RemoteServiceError.unsupportedAccount
         }
 
@@ -79,7 +79,7 @@ struct RemoteAssistantService {
             parts: parts,
             metadata: nil,
             extensions: [],
-            referenceTaskIds: []
+            referenceTaskIds: [],
         )
         var metadata: [String: A2ASendMessageRequest.MetadataValue] = [:]
         metadata["interface"] = .string("apple-app")
@@ -87,16 +87,16 @@ struct RemoteAssistantService {
         return A2ASendMessageRequest(
             message: message,
             configuration: nil,
-            metadata: metadata
+            metadata: metadata,
         )
     }
 
     private func extractReplyText(from response: A2ASendMessageResponse) -> String? {
         if let message = response.message {
-            return message.parts.compactMap { $0.text }.joined(separator: "\n")
+            return message.parts.compactMap(\.text).joined(separator: "\n")
         }
         if let taskMessage = response.task?.status.message {
-            return taskMessage.parts.compactMap { $0.text }.joined(separator: "\n")
+            return taskMessage.parts.compactMap(\.text).joined(separator: "\n")
         }
         return nil
     }

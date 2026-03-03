@@ -9,6 +9,8 @@ Key capabilities:
 - Chat interface that mirrors the existing web client: threaded history, composer, and assistant responses.
 - Multi-account aware data model. Every account is bound to a specific server URL so you can connect to several [`assistant`](https://github.com/cedricziel/assistant) deployments at the same time.
 - Login flow that persists account metadata in-memory today and is ready for persistence/back-end wiring.
+- Remote account credentials are stored in the system Keychain instead of plaintext account snapshots.
+- OpenAI is available as a first-party remote provider using API-key auth.
 
 ## Project layout
 
@@ -60,10 +62,13 @@ Required tooling:
 
 ## Talking to your servers
 
-- On first launch you will land on the login screen. Enter the base URL of your running [`cedricziel/assistant`](https://github.com/cedricziel/assistant) instance (for example, `https://localhost:3000`), give the profile a friendly display name, and paste the API token issued by the server.
+- On first launch you will land on the login screen. For **Assistant backend** accounts, enter the base URL of your running [`cedricziel/assistant`](https://github.com/cedricziel/assistant) instance (for example, `https://localhost:3000`) and the API token issued by that server.
+- For **OpenAI** accounts, choose the OpenAI provider and paste your OpenAI API key.
 - Each account remembers the server that issued it, so you can add as many as you need. Use the sidebar (or the account toolbar button) to switch between them.
 - The macOS menu bar extra mirrors the most recent thread so you can send a quick reply without revealing the full window.
 - Remote accounts call the assistant's A2A HTTP interface (`/message/send`) with a Bearer token, so any deployment exposing the [web UI endpoints](https://github.com/cedricziel/assistant/blob/main/docs/web-ui.md) automatically works with the native client.
+
+Account metadata is stored in `Application Support`, while remote credentials are written to Keychain.
 
 **Note:** Remote accounts already call the backend through `RemoteAssistantService`. Local account types currently use a placeholder local assistant implementation that echoes input; swap in your on-device model runtime when ready.
 

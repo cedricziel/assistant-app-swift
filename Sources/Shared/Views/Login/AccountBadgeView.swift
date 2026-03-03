@@ -14,7 +14,7 @@ struct AccountBadgeView: View {
             }
             Spacer()
             if account.accountType == .remote {
-                Text(account.redactedToken)
+                Text(remoteBadgeLabel)
                     .font(.footnote.monospaced())
                     .foregroundStyle(.secondary)
             } else {
@@ -29,12 +29,22 @@ struct AccountBadgeView: View {
     private var storageLabel: String {
         switch account.conversationStorage {
         case .remoteBackend:
-            return "Remote"
+            "Remote"
         case .deviceOnly:
-            return "Device"
+            "Device"
         case .iCloud:
-            return "iCloud"
+            "iCloud"
         }
+    }
+
+    private var remoteBadgeLabel: String {
+        let providerName = switch account.remoteProvider {
+        case .assistantBackend:
+            "Assistant"
+        case .openAI:
+            "OpenAI"
+        }
+        return "\(providerName) \(account.redactedToken)"
     }
 }
 

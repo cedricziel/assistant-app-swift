@@ -11,18 +11,20 @@ let package = Package(
     products: [
         .library(
             name: "AssistantShared",
-            targets: ["AssistantShared"]
+            targets: ["AssistantShared"],
         ),
     ],
     dependencies: [
         .package(url: "https://github.com/gonzalezreal/swift-markdown-ui", from: "2.4.1"),
+        .package(url: "https://github.com/MacPaw/OpenAI.git", from: "0.4.7"),
     ],
     targets: [
         .target(
             name: "AssistantShared",
             dependencies: [
                 .product(name: "MarkdownUI", package: "swift-markdown-ui"),
-            ]
+                .product(name: "OpenAI", package: "OpenAI"),
+            ],
         ),
-    ]
+    ],
 )

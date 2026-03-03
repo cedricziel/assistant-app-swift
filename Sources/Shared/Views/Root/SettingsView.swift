@@ -19,6 +19,11 @@ struct SettingsView: View {
                                 Text(account.server.displayName)
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
+                                if account.accountType == .remote {
+                                    Text(remoteProviderDescription(for: account))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
                                 Text(storageDescription(for: account))
                                     .font(.caption)
                                     .foregroundStyle(.tertiary)
@@ -40,11 +45,20 @@ struct SettingsView: View {
     private func storageDescription(for account: AssistantAccount) -> String {
         switch account.conversationStorage {
         case .remoteBackend:
-            return "Conversations stored on remote backend"
+            "Conversations stored on remote backend"
         case .deviceOnly:
-            return "Conversations stored on this device"
+            "Conversations stored on this device"
         case .iCloud:
-            return "Conversations stored in iCloud"
+            "Conversations stored in iCloud"
+        }
+    }
+
+    private func remoteProviderDescription(for account: AssistantAccount) -> String {
+        switch account.remoteProvider {
+        case .assistantBackend:
+            "Provider: Assistant backend"
+        case .openAI:
+            "Provider: OpenAI"
         }
     }
 }

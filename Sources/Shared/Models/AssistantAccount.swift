@@ -8,6 +8,7 @@ struct AssistantAccount: Identifiable, Hashable, Codable {
     var apiToken: String
     var createdAt: Date
     var accountType: AccountType
+    var remoteProvider: RemoteProvider
 
     init(
         id: UUID = UUID(),
@@ -16,7 +17,8 @@ struct AssistantAccount: Identifiable, Hashable, Codable {
         apiToken: String,
         server: ServerEnvironment,
         createdAt: Date = .now,
-        accountType: AccountType = .remote
+        accountType: AccountType = .remote,
+        remoteProvider: RemoteProvider = .assistantBackend,
     ) {
         self.id = id
         self.displayName = displayName
@@ -25,11 +27,56 @@ struct AssistantAccount: Identifiable, Hashable, Codable {
         self.server = server
         self.createdAt = createdAt
         self.accountType = accountType
+        self.remoteProvider = remoteProvider
     }
 
     var redactedToken: String {
         let suffix = apiToken.suffix(4)
         return "•••\(suffix)"
+    }
+}
+
+extension AssistantAccount {
+    enum RemoteProvider: String, Codable {
+        case assistantBackend
+        case openAI
+    }
+}
+
+extension AssistantAccount {
+    private enum CodingKeys: String, CodingKey {
+        case id
+        case displayName
+        case userHandle
+        case server
+        case apiToken
+        case createdAt
+        case accountType
+        case remoteProvider
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        userHandle = try container.decode(String.self, forKey: .userHandle)
+        server = try container.decode(ServerEnvironment.self, forKey: .server)
+        apiToken = try container.decodeIfPresent(String.self, forKey: .apiToken) ?? ""
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        accountType = try container.decodeIfPresent(AccountType.self, forKey: .accountType) ?? .remote
+        remoteProvider = try container
+            .decodeIfPresent(RemoteProvider.self, forKey: .remoteProvider) ?? .assistantBackend
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(displayName, forKey: .displayName)
+        try container.encode(userHandle, forKey: .userHandle)
+        try container.encode(server, forKey: .server)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(accountType, forKey: .accountType)
+        try container.encode(remoteProvider, forKey: .remoteProvider)
     }
 }
 
@@ -46,11 +93,11 @@ extension AssistantAccount {
         var conversationStorage: ConversationStorage {
             switch self {
             case .remote:
-                return .remoteBackend
+                .remoteBackend
             case .localDevice:
-                return .deviceOnly
+                .deviceOnly
             case .localICloud:
-                return .iCloud
+                .iCloud
             }
         }
     }
@@ -75,6 +122,6 @@ extension AssistantAccount {
         displayName: "Primary",
         userHandle: "you",
         apiToken: "dev-token",
-        server: .placeholder
+        server: .placeholder,
     )
 }

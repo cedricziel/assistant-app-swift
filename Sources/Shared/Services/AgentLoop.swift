@@ -13,6 +13,7 @@ struct AgentLoop {
     enum Backend: String {
         case local
         case remote
+        case openAI
     }
 
     struct TraceEvent: Identifiable {
@@ -56,32 +57,35 @@ struct AgentLoop {
         var trace: [TraceEvent] {
             switch self {
             case let .failed(_, trace):
-                return trace
+                trace
             case let .exhausted(trace):
-                return trace
+                trace
             }
         }
 
         var errorDescription: String? {
             switch self {
             case let .failed(underlying, _):
-                return underlying.localizedDescription
+                underlying.localizedDescription
             case .exhausted:
-                return AgentLoopError.exhaustedRetries.localizedDescription
+                AgentLoopError.exhaustedRetries.localizedDescription
             }
         }
     }
 
     private let remoteService: RemoteAssistantService
+    private let openAIService: OpenAIAssistantService
     private let localService: LocalAssistantService
     private let policy: Policy
 
     init(
         remoteService: RemoteAssistantService = RemoteAssistantService(),
+        openAIService: OpenAIAssistantService = OpenAIAssistantService(),
         localService: LocalAssistantService = LocalAssistantService(),
-        policy: Policy = Policy()
+        policy: Policy = Policy(),
     ) {
         self.remoteService = remoteService
+        self.openAIService = openAIService
         self.localService = localService
         self.policy = policy
     }
@@ -92,23 +96,28 @@ struct AgentLoop {
 
         var attempt = 1
         while attempt <= policy.maxAttempts {
-            trace.append(TraceEvent(phase: .planning, detail: "Selected \(backend.rawValue) backend.", attempt: attempt))
+            trace.append(TraceEvent(
+                phase: .planning,
+                detail: "Selected \(backend.rawValue) backend.",
+                attempt: attempt,
+            ))
 
             do {
                 trace.append(TraceEvent(phase: .generating, detail: "Generating assistant response.", attempt: attempt))
-                let response = try await generate(
-                    with: backend,
-                    message: message,
-                    account: account,
-                    thread: thread
-                )
+                let response = try await generate(with: backend, message: message, account: account, thread: thread)
 
                 trace.append(TraceEvent(phase: .acting, detail: "No tool actions for this turn.", attempt: attempt))
                 trace.append(TraceEvent(phase: .reflecting, detail: "Response accepted.", attempt: attempt))
                 trace.append(TraceEvent(phase: .completed, detail: "Turn completed.", attempt: attempt))
                 return Output(message: response, trace: trace)
             } catch {
-                trace.append(TraceEvent(phase: .reflecting, detail: "Generation failed: \(error.localizedDescription)", attempt: attempt))
+                trace.append(
+                    TraceEvent(
+                        phase: .reflecting,
+                        detail: "Generation failed: \(error.localizedDescription)",
+                        attempt: attempt,
+                    ),
+                )
 
                 guard shouldRetry(error: error, backend: backend, attempt: attempt) else {
                     trace.append(TraceEvent(phase: .failed, detail: "Turn failed without retry.", attempt: attempt))
@@ -128,9 +137,14 @@ struct AgentLoop {
     private func selectBackend(for account: AssistantAccount) -> Backend {
         switch account.accountType {
         case .remote:
-            return .remote
+            switch account.remoteProvider {
+            case .assistantBackend:
+                .remote
+            case .openAI:
+                .openAI
+            }
         case .localDevice, .localICloud:
-            return .local
+            .local
         }
     }
 
@@ -138,18 +152,20 @@ struct AgentLoop {
         with backend: Backend,
         message: String,
         account: AssistantAccount,
-        thread: ChatThread
+        thread: ChatThread,
     ) async throws -> ChatMessage {
         switch backend {
         case .remote:
-            return try await remoteService.send(text: message, account: account, conversationID: thread.id)
+            try await remoteService.send(text: message, account: account, conversationID: thread.id)
+        case .openAI:
+            try await openAIService.send(text: message, account: account, conversationID: thread.id)
         case .local:
-            return try await localService.send(text: message, account: account, conversationID: thread.id)
+            try await localService.send(text: message, account: account, conversationID: thread.id)
         }
     }
 
     private func shouldRetry(error: Error, backend: Backend, attempt: Int) -> Bool {
-        guard backend == .remote else { return false }
+        guard backend == .remote || backend == .openAI else { return false }
         guard attempt < policy.maxAttempts else { return false }
 
         if error is URLError {
