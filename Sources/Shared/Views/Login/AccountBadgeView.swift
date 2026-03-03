@@ -13,23 +13,15 @@ struct AccountBadgeView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if account.accountType == .remote {
-                Text(remoteBadgeLabel)
-                    .font(.footnote.monospaced())
-                    .foregroundStyle(.secondary)
-            } else {
-                Text(storageLabel)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
+            Text(badgeLabel)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
         .padding(.vertical, 4)
     }
 
     private var storageLabel: String {
         switch account.conversationStorage {
-        case .remoteBackend:
-            "Remote"
         case .deviceOnly:
             "Device"
         case .iCloud:
@@ -37,14 +29,21 @@ struct AccountBadgeView: View {
         }
     }
 
-    private var remoteBadgeLabel: String {
-        let providerName = switch account.remoteProvider {
+    private var badgeLabel: String {
+        switch account.routing {
         case .assistantBackend:
-            "Assistant"
-        case .openAI:
-            account.remoteAuthMode == .chatGPTSubscription ? "OpenAI Sub" : "OpenAI"
+            return "Assistant \(account.redactedToken)"
+        case .directProviders:
+            let providerName = switch account.selectedDirectProvider?.provider {
+            case .openAI:
+                account.selectedDirectProvider?.auth == .chatGPTSubscription ? "OpenAI Sub" : "OpenAI"
+            case .local:
+                "Local"
+            case nil:
+                "No provider"
+            }
+            return "\(providerName) · \(storageLabel)"
         }
-        return "\(providerName) \(account.redactedToken)"
     }
 }
 

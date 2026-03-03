@@ -28,10 +28,16 @@ struct LoginView: View {
     @State private var serverAddress: String = "https://assistant.local"
     @State private var displayName: String = ""
     @State private var apiToken: String = ""
-    @State private var accountType: AssistantAccount.AccountType = .remote
-    @State private var remoteProvider: AssistantAccount.RemoteProvider = .assistantBackend
-    @State private var remoteAuthMode: AssistantAccount.RemoteAuthMode = .apiKey
+    @State private var routingMode: RoutingMode = .assistantBackend
+    @State private var directProvider: AssistantAccount.ModelProvider = .openAI
+    @State private var openAIAuthMode: AssistantAccount.ProviderAuth = .apiKey
+    @State private var syncInICloud = true
     @FocusState private var focusedField: Field?
+
+    enum RoutingMode: String {
+        case assistantBackend
+        case directProviders
+    }
 
     enum Field {
         case server
@@ -51,74 +57,77 @@ struct LoginView: View {
             .padding(.horizontal)
 
             Form {
-                Section("Account") {
-                    Picker("Storage", selection: $accountType) {
-                        Text("Remote backend").tag(AssistantAccount.AccountType.remote)
-                        Text("On this device").tag(AssistantAccount.AccountType.localDevice)
-                        Text("iCloud sync").tag(AssistantAccount.AccountType.localICloud)
+                Section("Routing") {
+                    Picker("Route conversations", selection: $routingMode) {
+                        Text("Assistant backend").tag(RoutingMode.assistantBackend)
+                        Text("Direct providers").tag(RoutingMode.directProviders)
                     }
                 }
 
-                if accountType == .remote {
-                    Section("Provider") {
-                        Picker("Remote provider", selection: $remoteProvider) {
-                            Text("Assistant backend").tag(AssistantAccount.RemoteProvider.assistantBackend)
-                            Text("OpenAI").tag(AssistantAccount.RemoteProvider.openAI)
+                if routingMode == .directProviders {
+                    Section("Providers") {
+                        Picker("Primary provider", selection: $directProvider) {
+                            Text("OpenAI").tag(AssistantAccount.ModelProvider.openAI)
+                            Text("Local model").tag(AssistantAccount.ModelProvider.local)
                         }
                     }
 
-                    if remoteProvider == .openAI {
+                    if directProvider == .openAI {
                         Section("Authentication") {
-                            Picker("Mode", selection: $remoteAuthMode) {
-                                Text("API key").tag(AssistantAccount.RemoteAuthMode.apiKey)
-                                Text("ChatGPT Plus/Pro").tag(AssistantAccount.RemoteAuthMode.chatGPTSubscription)
+                            Picker("Mode", selection: $openAIAuthMode) {
+                                Text("API key").tag(AssistantAccount.ProviderAuth.apiKey)
+                                Text("ChatGPT Plus/Pro").tag(AssistantAccount.ProviderAuth.chatGPTSubscription)
                             }
                         }
                     }
+                }
 
-                    if remoteProvider == .assistantBackend {
-                        Section("Server") {
-                            Group {
-                                #if os(iOS)
-                                TextField("https://assistant.local", text: $serverAddress)
-                                    .keyboardType(.URL)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                #else
-                                TextField("https://assistant.local", text: $serverAddress)
-                                #endif
-                            }
-                            .focused($focusedField, equals: .server)
+                Section("Sync") {
+                    Toggle("Sync in iCloud", isOn: $syncInICloud)
+                }
+
+                if routingMode == .assistantBackend {
+                    Section("Server") {
+                        Group {
+                            #if os(iOS)
+                            TextField("https://assistant.local", text: $serverAddress)
+                                .keyboardType(.URL)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                            #else
+                            TextField("https://assistant.local", text: $serverAddress)
+                            #endif
                         }
+                        .focused($focusedField, equals: .server)
                     }
+                }
 
-                    if requiresManualCredential {
-                        Section("Credentials") {
-                            Group {
-                                #if os(iOS)
-                                SecureField(tokenPlaceholder, text: $apiToken)
-                                    .textInputAutocapitalization(.never)
-                                    .autocorrectionDisabled()
-                                #else
-                                SecureField(tokenPlaceholder, text: $apiToken)
-                                #endif
-                            }
-                            .focused($focusedField, equals: .token)
+                if requiresManualCredential {
+                    Section("Credentials") {
+                        Group {
+                            #if os(iOS)
+                            SecureField(tokenPlaceholder, text: $apiToken)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                            #else
+                            SecureField(tokenPlaceholder, text: $apiToken)
+                            #endif
                         }
+                        .focused($focusedField, equals: .token)
                     }
+                }
 
-                    if let pending = accountStore.pendingOpenAIAuthorization {
-                        Section("Authorization") {
-                            Text(pending.instructions)
-                                .foregroundStyle(.secondary)
-                            Text("Code: \(pending.userCode)")
-                                .font(.body.monospaced().bold())
-                            Button("Copy Code") {
-                                copyToClipboard(pending.userCode)
-                            }
-                            Button("Open ChatGPT Authorization") {
-                                open(url: pending.verificationURL)
-                            }
+                if let pending = accountStore.pendingOpenAIAuthorization {
+                    Section("Authorization") {
+                        Text(pending.instructions)
+                            .foregroundStyle(.secondary)
+                        Text("Code: \(pending.userCode)")
+                            .font(.body.monospaced().bold())
+                        Button("Copy Code") {
+                            copyToClipboard(pending.userCode)
+                        }
+                        Button("Open ChatGPT Authorization") {
+                            open(url: pending.verificationURL)
                         }
                     }
                 }
@@ -173,76 +182,111 @@ struct LoginView: View {
         .onAppear {
             focusedField = initialFocusedField
         }
-        .onChange(of: accountType) { _, newValue in
-            if newValue != .remote {
-                remoteProvider = .assistantBackend
-                remoteAuthMode = .apiKey
+        .onChange(of: routingMode) { _, newValue in
+            if newValue == .assistantBackend {
+                syncInICloud = true
+            }
+            if newValue == .directProviders, directProvider == .local {
+                apiToken = ""
             }
             focusedField = initialFocusedField
         }
-        .onChange(of: remoteProvider) { _, _ in
-            if remoteProvider != .openAI {
-                remoteAuthMode = .apiKey
+        .onChange(of: directProvider) { _, newValue in
+            if newValue == .local {
+                openAIAuthMode = .none
+                apiToken = ""
+            } else if openAIAuthMode == .none {
+                openAIAuthMode = .apiKey
             }
             focusedField = initialFocusedField
         }
-        .onChange(of: remoteAuthMode) { _, _ in
+        .onChange(of: openAIAuthMode) { _, _ in
             focusedField = initialFocusedField
         }
     }
+}
 
-    private var subtitle: String {
-        switch accountType {
-        case .remote:
-            switch remoteProvider {
-            case .assistantBackend:
-                "Sign in with a server and token to continue."
-            case .openAI:
-                if remoteAuthMode == .chatGPTSubscription {
-                    "Connect your ChatGPT Plus/Pro subscription to use Codex models."
-                } else {
-                    "Connect OpenAI with an API key to send messages directly."
-                }
-            }
-        case .localDevice, .localICloud:
-            "Create a local profile to keep conversations on your devices."
-        }
-    }
-
-    private var tokenPlaceholder: String {
-        switch remoteProvider {
+private extension LoginView {
+    var subtitle: String {
+        switch routingMode {
         case .assistantBackend:
+            "All turns go through your Assistant backend. iCloud sync is enabled by default."
+        case .directProviders:
+            if directProvider == .openAI, openAIAuthMode == .chatGPTSubscription {
+                "Use your ChatGPT Plus/Pro subscription directly from this app."
+            } else if directProvider == .openAI {
+                "Connect OpenAI with an API key to send messages directly."
+            } else {
+                "Use a local on-device provider and keep data under your sync policy."
+            }
+        }
+    }
+
+    var tokenPlaceholder: String {
+        if routingMode == .assistantBackend {
             "API token"
-        case .openAI:
+        } else {
             "OpenAI API key"
         }
     }
 
-    private var initialFocusedField: Field? {
-        guard accountType == .remote else {
-            return .name
-        }
-
-        if remoteProvider == .assistantBackend {
+    var initialFocusedField: Field? {
+        if routingMode == .assistantBackend {
             return .server
         }
 
-        if remoteProvider == .openAI, remoteAuthMode == .chatGPTSubscription {
+        if directProvider == .openAI, openAIAuthMode == .chatGPTSubscription {
             return .name
         }
 
         return .token
     }
 
-    private func authenticate() {
+    var syncPolicy: AssistantAccount.SyncPolicy {
+        if syncInICloud {
+            return .iCloud(.init())
+        }
+        return .deviceOnly
+    }
+
+    var routing: AssistantAccount.Routing {
+        switch routingMode {
+        case .assistantBackend:
+            let serverURL = URL(string: serverAddress) ?? URL(string: "https://assistant.local")!
+            return .assistantBackend(
+                .init(
+                    server: ServerEnvironment(
+                        name: serverURL.host ?? serverURL.absoluteString,
+                        baseURL: serverURL,
+                        kind: .remote,
+                    ),
+                    credentialKind: .apiKey,
+                ),
+            )
+        case .directProviders:
+            let profile = AssistantAccount.ProviderProfile(
+                provider: directProvider,
+                auth: directProvider == .openAI ? openAIAuthMode : .none,
+                label: directProvider == .openAI ? "OpenAI" : "Local",
+                isEnabled: true,
+            )
+            return .directProviders(
+                .init(
+                    providers: [profile],
+                    defaultProviderID: profile.id,
+                ),
+            )
+        }
+    }
+
+    func authenticate() {
         Task {
             await accountStore.login(
                 serverAddress: serverAddress,
                 apiToken: apiToken,
                 displayName: displayName,
-                accountType: accountType,
-                remoteProvider: remoteProvider,
-                remoteAuthMode: remoteAuthMode,
+                routing: routing,
+                syncPolicy: syncPolicy,
             )
             if let account = accountStore.activeAccount {
                 _ = chatStore.ensureDefaultThread(for: account)
@@ -250,29 +294,20 @@ struct LoginView: View {
         }
     }
 
-    private var isConnectDisabled: Bool {
-        switch accountType {
-        case .remote:
-            let missingServer = remoteProvider == .assistantBackend && serverAddress.isBlank
-            let missingCredential = requiresManualCredential && apiToken.isBlank
-            return missingCredential || missingServer
-        case .localDevice, .localICloud:
-            return false
-        }
+    var isConnectDisabled: Bool {
+        let missingServer = routingMode == .assistantBackend && serverAddress.isBlank
+        let missingCredential = requiresManualCredential && apiToken.isBlank
+        return missingCredential || missingServer
     }
-}
 
-private extension LoginView {
     var requiresManualCredential: Bool {
-        guard accountType == .remote else {
+        if routingMode == .assistantBackend {
+            return true
+        }
+        if directProvider == .openAI, openAIAuthMode == .chatGPTSubscription {
             return false
         }
-
-        if remoteProvider == .openAI, remoteAuthMode == .chatGPTSubscription {
-            return false
-        }
-
-        return true
+        return directProvider == .openAI
     }
 
     func open(url: URL) {

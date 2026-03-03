@@ -69,8 +69,6 @@ struct ChatThreadPersistence: ChatThreadPersisting {
             deviceSupportDirectory()
         case .iCloud:
             try iCloudSupportDirectory()
-        case .remoteBackend:
-            deviceSupportDirectory()
         }
     }
 

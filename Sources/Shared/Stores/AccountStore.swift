@@ -12,9 +12,26 @@ final class AccountStore: ObservableObject {
         let serverAddress: String
         let apiToken: String
         let displayName: String
-        let accountType: AssistantAccount.AccountType
-        let remoteProvider: AssistantAccount.RemoteProvider
-        let remoteAuthMode: AssistantAccount.RemoteAuthMode
+        let routing: AssistantAccount.Routing
+        let syncPolicy: AssistantAccount.SyncPolicy
+
+        var requiresOpenAISubscriptionAuth: Bool {
+            guard case let .directProviders(config) = routing else {
+                return false
+            }
+
+            let provider: AssistantAccount.ProviderProfile? = if let defaultProviderID = config.defaultProviderID {
+                config.providers.first(where: { $0.id == defaultProviderID && $0.isEnabled })
+            } else {
+                config.providers.first(where: { $0.isEnabled })
+            }
+
+            guard let provider else {
+                return false
+            }
+
+            return provider.provider == .openAI && provider.auth == .chatGPTSubscription
+        }
     }
 
     @Published private(set) var accounts: [AssistantAccount]
@@ -100,9 +117,8 @@ final class AccountStore: ObservableObject {
         serverAddress: String,
         apiToken: String,
         displayName: String,
-        accountType: AssistantAccount.AccountType,
-        remoteProvider: AssistantAccount.RemoteProvider = .assistantBackend,
-        remoteAuthMode: AssistantAccount.RemoteAuthMode = .apiKey,
+        routing: AssistantAccount.Routing,
+        syncPolicy: AssistantAccount.SyncPolicy,
     ) async {
         authenticationError = nil
         pendingOpenAIAuthorization = nil
@@ -114,9 +130,8 @@ final class AccountStore: ObservableObject {
                 serverAddress: serverAddress,
                 apiToken: apiToken,
                 displayName: displayName,
-                accountType: accountType,
-                remoteProvider: remoteProvider,
-                remoteAuthMode: remoteAuthMode,
+                routing: routing,
+                syncPolicy: syncPolicy,
             )
             let value = try await buildAuthenticatedAccount(
                 request: request,
@@ -136,6 +151,8 @@ final class AccountStore: ObservableObject {
                     remoteProvider: value.account.remoteProvider,
                     remoteAuthMode: value.account.remoteAuthMode,
                     openAIAccountID: value.account.openAIAccountID,
+                    routing: value.account.routing,
+                    syncPolicy: value.account.syncPolicy,
                 )
                 activeAccountID = existing.id
             } else {
@@ -160,16 +177,14 @@ final class AccountStore: ObservableObject {
     }
 
     private func matchesIdentity(of candidate: AssistantAccount, with account: AssistantAccount) -> Bool {
-        candidate.accountType == account.accountType
-            && candidate.remoteProvider == account.remoteProvider
-            && candidate.remoteAuthMode == account.remoteAuthMode
+        candidate.routing == account.routing
             && candidate.server.baseURL == account.server.baseURL
             && candidate.userHandle == account.userHandle
     }
 
     private func hydrateCredentials(in accounts: [AssistantAccount]) -> [AssistantAccount] {
         accounts.map { account in
-            guard account.accountType == .remote else {
+            guard account.requiresCredential else {
                 return account
             }
 
@@ -201,17 +216,13 @@ final class AccountStore: ObservableObject {
     private func buildAuthenticatedAccount(
         request: LoginRequest,
     ) async throws -> (account: AssistantAccount, credential: RemoteCredential) {
-        guard request.accountType == .remote,
-              request.remoteProvider == .openAI,
-              request.remoteAuthMode == .chatGPTSubscription
-        else {
+        guard request.requiresOpenAISubscriptionAuth else {
             let account = try await authenticationService.login(
                 serverAddress: request.serverAddress,
                 apiToken: request.apiToken,
                 displayName: request.displayName,
-                accountType: request.accountType,
-                remoteProvider: request.remoteProvider,
-                remoteAuthMode: request.remoteAuthMode,
+                routing: request.routing,
+                syncPolicy: request.syncPolicy,
             )
             return (account, .apiKey(account.apiToken))
         }
@@ -229,10 +240,8 @@ final class AccountStore: ObservableObject {
             serverAddress: request.serverAddress,
             apiToken: tokens.accessToken,
             displayName: request.displayName,
-            accountType: request.accountType,
-            remoteProvider: request.remoteProvider,
-            remoteAuthMode: .chatGPTSubscription,
-            openAIAccountID: tokens.accountID,
+            routing: request.routing.replacingOpenAIAccountID(with: tokens.accountID),
+            syncPolicy: request.syncPolicy,
         )
 
         let credential = RemoteCredential.openAISubscription(
@@ -268,11 +277,47 @@ final class AccountStore: ObservableObject {
     }
 }
 
+private extension AssistantAccount {
+    var requiresCredential: Bool {
+        switch routing {
+        case .assistantBackend:
+            true
+        case let .directProviders(config):
+            config.providers.contains(where: { profile in
+                profile.isEnabled && profile.auth != .none
+            })
+        }
+    }
+}
+
+extension AssistantAccount.Routing {
+    func replacingOpenAIAccountID(with accountID: String?) -> Self {
+        switch self {
+        case let .assistantBackend(config):
+            return .assistantBackend(config)
+        case let .directProviders(config):
+            guard let targetID = config.defaultProviderID,
+                  let index = config.providers.firstIndex(where: { $0.id == targetID })
+            else {
+                return self
+            }
+
+            var nextConfig = config
+            let provider = nextConfig.providers[index]
+            guard provider.provider == .openAI else {
+                return self
+            }
+            nextConfig.providers[index].label = accountID.map { "OpenAI (\($0))" } ?? provider.label
+            return .directProviders(nextConfig)
+        }
+    }
+}
+
 extension AccountStore {
     func refreshOpenAISubscriptionCredentialIfNeeded(for account: AssistantAccount) async throws -> AssistantAccount {
-        guard account.accountType == .remote,
-              account.remoteProvider == .openAI,
-              account.remoteAuthMode == .chatGPTSubscription
+        guard let provider = account.selectedDirectProvider,
+              provider.provider == .openAI,
+              provider.auth == .chatGPTSubscription
         else {
             return account
         }

@@ -39,7 +39,7 @@ struct RemoteAssistantService {
         account: AssistantAccount,
         conversationID: UUID,
     ) async throws -> ChatMessage {
-        guard account.accountType.supportsRemoteTransport, account.remoteProvider == .assistantBackend else {
+        guard account.usesAssistantBackendRouting else {
             throw RemoteServiceError.unsupportedAccount
         }
 

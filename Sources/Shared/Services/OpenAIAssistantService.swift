@@ -30,15 +30,19 @@ struct OpenAIAssistantService {
     }
 
     func send(text: String, account: AssistantAccount, conversationID _: UUID) async throws -> ChatMessage {
-        guard account.accountType == .remote, account.remoteProvider == .openAI else {
+        guard let provider = account.selectedDirectProvider,
+              provider.provider == .openAI
+        else {
             throw OpenAIServiceError.unsupportedAccount
         }
 
-        switch account.remoteAuthMode {
+        switch provider.auth {
         case .apiKey:
             return try await sendWithAPIKey(text: text, account: account)
         case .chatGPTSubscription:
             return try await sendWithSubscription(text: text, account: account)
+        case .none:
+            throw OpenAIServiceError.missingCredentials
         }
     }
 

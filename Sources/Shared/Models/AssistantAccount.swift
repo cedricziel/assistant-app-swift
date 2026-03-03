@@ -7,10 +7,16 @@ struct AssistantAccount: Identifiable, Hashable, Codable {
     var server: ServerEnvironment
     var apiToken: String
     var createdAt: Date
+
+    // Legacy fields retained for migration compatibility.
     var accountType: AccountType
     var remoteProvider: RemoteProvider
     var remoteAuthMode: RemoteAuthMode
     var openAIAccountID: String?
+
+    // Target model fields.
+    var routing: Routing
+    var syncPolicy: SyncPolicy
 
     init(
         id: UUID = UUID(),
@@ -23,7 +29,18 @@ struct AssistantAccount: Identifiable, Hashable, Codable {
         remoteProvider: RemoteProvider = .assistantBackend,
         remoteAuthMode: RemoteAuthMode = .apiKey,
         openAIAccountID: String? = nil,
+        routing: Routing? = nil,
+        syncPolicy: SyncPolicy? = nil,
     ) {
+        let resolvedRouting = routing ?? Self.routingFromLegacy(
+            accountType: accountType,
+            remoteProvider: remoteProvider,
+            remoteAuthMode: remoteAuthMode,
+            server: server,
+            openAIAccountID: openAIAccountID,
+        )
+        let resolvedSyncPolicy = syncPolicy ?? Self.syncPolicyFromLegacy(accountType: accountType)
+
         self.id = id
         self.displayName = displayName
         self.userHandle = userHandle
@@ -34,6 +51,8 @@ struct AssistantAccount: Identifiable, Hashable, Codable {
         self.remoteProvider = remoteProvider
         self.remoteAuthMode = remoteAuthMode
         self.openAIAccountID = openAIAccountID
+        self.routing = resolvedRouting
+        self.syncPolicy = resolvedSyncPolicy
     }
 
     var redactedToken: String {
@@ -66,6 +85,8 @@ extension AssistantAccount {
         case remoteProvider
         case remoteAuthMode
         case openAIAccountID
+        case routing
+        case syncPolicy
     }
 
     init(from decoder: Decoder) throws {
@@ -81,6 +102,18 @@ extension AssistantAccount {
             .decodeIfPresent(RemoteProvider.self, forKey: .remoteProvider) ?? .assistantBackend
         remoteAuthMode = try container.decodeIfPresent(RemoteAuthMode.self, forKey: .remoteAuthMode) ?? .apiKey
         openAIAccountID = try container.decodeIfPresent(String.self, forKey: .openAIAccountID)
+
+        routing = try container.decodeIfPresent(Routing.self, forKey: .routing)
+            ?? Self.routingFromLegacy(
+                accountType: accountType,
+                remoteProvider: remoteProvider,
+                remoteAuthMode: remoteAuthMode,
+                server: server,
+                openAIAccountID: openAIAccountID,
+            )
+
+        syncPolicy = try container.decodeIfPresent(SyncPolicy.self, forKey: .syncPolicy)
+            ?? Self.syncPolicyFromLegacy(accountType: accountType)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -94,6 +127,8 @@ extension AssistantAccount {
         try container.encode(remoteProvider, forKey: .remoteProvider)
         try container.encode(remoteAuthMode, forKey: .remoteAuthMode)
         try container.encodeIfPresent(openAIAccountID, forKey: .openAIAccountID)
+        try container.encode(routing, forKey: .routing)
+        try container.encode(syncPolicy, forKey: .syncPolicy)
     }
 }
 
@@ -110,7 +145,7 @@ extension AssistantAccount {
         var conversationStorage: ConversationStorage {
             switch self {
             case .remote:
-                .remoteBackend
+                .deviceOnly
             case .localDevice:
                 .deviceOnly
             case .localICloud:
@@ -120,17 +155,21 @@ extension AssistantAccount {
     }
 
     enum ConversationStorage: String, Codable {
-        case remoteBackend
         case deviceOnly
         case iCloud
 
         var persistsLocally: Bool {
-            self == .deviceOnly || self == .iCloud
+            true
         }
     }
 
     var conversationStorage: ConversationStorage {
-        accountType.conversationStorage
+        switch syncPolicy {
+        case .deviceOnly:
+            .deviceOnly
+        case .iCloud:
+            .iCloud
+        }
     }
 }
 

@@ -19,11 +19,9 @@ struct SettingsView: View {
                                 Text(account.server.displayName)
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
-                                if account.accountType == .remote {
-                                    Text(remoteProviderDescription(for: account))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+                                Text(routingDescription(for: account))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
                                 Text(storageDescription(for: account))
                                     .font(.caption)
                                     .foregroundStyle(.tertiary)
@@ -44,8 +42,6 @@ struct SettingsView: View {
 
     private func storageDescription(for account: AssistantAccount) -> String {
         switch account.conversationStorage {
-        case .remoteBackend:
-            "Conversations stored on remote backend"
         case .deviceOnly:
             "Conversations stored on this device"
         case .iCloud:
@@ -53,18 +49,17 @@ struct SettingsView: View {
         }
     }
 
-    private func remoteProviderDescription(for account: AssistantAccount) -> String {
-        switch account.remoteProvider {
+    private func routingDescription(for account: AssistantAccount) -> String {
+        switch account.routing {
         case .assistantBackend:
-            return "Provider: Assistant backend"
-        case .openAI:
-            let mode = switch account.remoteAuthMode {
-            case .apiKey:
-                "API key"
-            case .chatGPTSubscription:
-                "ChatGPT Plus/Pro"
+            return "Routing: Assistant backend"
+        case let .directProviders(config):
+            let enabled = config.providers.filter(\.isEnabled)
+            if enabled.isEmpty {
+                return "Routing: Direct providers (none configured)"
             }
-            return "Provider: OpenAI (\(mode))"
+            let labels = enabled.map(\.label).joined(separator: ", ")
+            return "Routing: Direct providers (\(labels))"
         }
     }
 }

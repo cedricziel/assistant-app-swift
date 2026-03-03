@@ -135,16 +135,19 @@ struct AgentLoop {
     }
 
     private func selectBackend(for account: AssistantAccount) -> Backend {
-        switch account.accountType {
-        case .remote:
-            switch account.remoteProvider {
-            case .assistantBackend:
-                .remote
-            case .openAI:
-                .openAI
+        switch account.routing {
+        case .assistantBackend:
+            return .remote
+        case .directProviders:
+            guard let provider = account.selectedDirectProvider else {
+                return .local
             }
-        case .localDevice, .localICloud:
-            .local
+            switch provider.provider {
+            case .openAI:
+                return .openAI
+            case .local:
+                return .local
+            }
         }
     }
 
