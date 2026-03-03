@@ -4,7 +4,7 @@ options:
   deploymentTarget:
     iOS: '26.2'
     macOS: '26.2'
-  bundleIdPrefix: app.assistant
+  bundleIdPrefix: com.cedricziel.assistant.app
 configs:
   Debug: debug
   Release: release
@@ -36,8 +36,9 @@ targets:
       - package: AssistantShared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.assistant.ios
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.assistant.app.ios
         IPHONEOS_DEPLOYMENT_TARGET: '26.2'
+        CODE_SIGN_ENTITLEMENTS: Configurations/Assistant-iOS.entitlements
     info:
       path: Configurations/Assistant-iOS-Info.plist
       properties:
@@ -73,8 +74,9 @@ targets:
       - package: AssistantShared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: app.assistant.macos
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.assistant.app.macos
         MACOSX_DEPLOYMENT_TARGET: '26.2'
+        CODE_SIGN_ENTITLEMENTS: Configurations/Assistant-macOS.entitlements
     info:
       path: Configurations/Assistant-macOS-Info.plist
       properties:
