@@ -191,6 +191,12 @@ prettier --check <file>.md
 - For new UX flows, research the relevant HIG guidance before implementation and align behavior, layout, and copy with platform expectations.
 - If a design intentionally diverges from HIG, document the rationale in PR/commit notes.
 
+### Multi-viewport support
+
+- Design and validate new functionality for iPhone, iPad, and macOS viewports.
+- Treat cross-platform viewport support as a requirement: new UX should work across all supported form factors.
+- If gaps are discovered on any viewport, fix them before considering the work complete.
+
 ### Data and privacy
 
 - Avoid displaying or logging raw API tokens.
