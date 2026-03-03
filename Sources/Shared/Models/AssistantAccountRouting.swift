@@ -147,65 +147,6 @@ extension AssistantAccount {
 }
 
 extension AssistantAccount {
-    static func routingFromLegacy(
-        accountType: AccountType,
-        remoteProvider: RemoteProvider,
-        remoteAuthMode: RemoteAuthMode,
-        server: ServerEnvironment,
-        openAIAccountID: String?,
-    ) -> Routing {
-        if accountType == .remote, remoteProvider == .assistantBackend {
-            let credentialKind: CredentialKind = switch remoteAuthMode {
-            case .apiKey:
-                .apiKey
-            case .chatGPTSubscription:
-                .chatGPTSubscription
-            }
-            return .assistantBackend(
-                AssistantBackendConfig(
-                    server: server,
-                    credentialKind: credentialKind,
-                ),
-            )
-        }
-
-        var providers: [ProviderProfile] = []
-        if accountType == .remote, remoteProvider == .openAI {
-            let auth: ProviderAuth = switch remoteAuthMode {
-            case .apiKey:
-                .apiKey
-            case .chatGPTSubscription:
-                .chatGPTSubscription
-            }
-            let label = openAIAccountID.map { "OpenAI (\($0))" } ?? "OpenAI"
-            providers.append(
-                ProviderProfile(
-                    provider: .openAI,
-                    auth: auth,
-                    label: label,
-                ),
-            )
-        }
-
-        return .directProviders(
-            DirectProvidersConfig(
-                providers: providers,
-                defaultProviderID: providers.first?.id,
-            ),
-        )
-    }
-
-    static func syncPolicyFromLegacy(accountType: AccountType) -> SyncPolicy {
-        switch accountType {
-        case .remote:
-            .iCloud(ICloudSyncConfig())
-        case .localDevice:
-            .deviceOnly
-        case .localICloud:
-            .iCloud(ICloudSyncConfig())
-        }
-    }
-
     var selectedDirectProvider: ProviderProfile? {
         guard case let .directProviders(config) = routing else {
             return nil

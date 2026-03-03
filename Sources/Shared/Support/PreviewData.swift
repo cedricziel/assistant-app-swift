@@ -7,6 +7,13 @@ enum PreviewData {
         userHandle: "previewer",
         apiToken: "preview-token",
         server: server,
+        routing: .assistantBackend(
+            .init(
+                server: server,
+                credentialKind: .apiKey,
+            ),
+        ),
+        syncPolicy: .deviceOnly,
     )
     static let thread: ChatThread = {
         let intro = ChatMessage.system("Preview bootstrap ready")

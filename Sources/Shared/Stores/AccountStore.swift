@@ -147,10 +147,6 @@ final class AccountStore: ObservableObject {
                     apiToken: value.account.apiToken,
                     server: value.account.server,
                     createdAt: existing.createdAt,
-                    accountType: value.account.accountType,
-                    remoteProvider: value.account.remoteProvider,
-                    remoteAuthMode: value.account.remoteAuthMode,
-                    openAIAccountID: value.account.openAIAccountID,
                     routing: value.account.routing,
                     syncPolicy: value.account.syncPolicy,
                 )
@@ -197,10 +193,6 @@ final class AccountStore: ObservableObject {
 
                 if let credential = try credential(for: account.id) {
                     hydrated.apiToken = credential.activeToken
-                    if let subscription = credential.subscription {
-                        hydrated.remoteAuthMode = .chatGPTSubscription
-                        hydrated.openAIAccountID = subscription.accountID
-                    }
                 } else {
                     hydrated.apiToken = ""
                 }
@@ -348,7 +340,9 @@ extension AccountStore {
         }
 
         accounts[index].apiToken = refreshed.accessToken
-        accounts[index].openAIAccountID = refreshed.accountID ?? subscription.accountID
+        accounts[index].routing = accounts[index].routing.replacingOpenAIAccountID(
+            with: refreshed.accountID ?? subscription.accountID,
+        )
         persistSnapshot()
         return accounts[index]
     }
