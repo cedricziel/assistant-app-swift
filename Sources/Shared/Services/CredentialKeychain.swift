@@ -18,7 +18,7 @@ struct CredentialKeychain {
 
     private let service: String
 
-    init(service: String = "app.assistant.credentials") {
+    init(service: String = "com.cedricziel.assistant.app.credentials") {
         self.service = service
     }
 
