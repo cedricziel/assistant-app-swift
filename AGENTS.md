@@ -141,6 +141,7 @@ prettier --check <file>.md
 - Use MVVM for new views going forward.
 - Keep view models responsible for presentation/business logic and state transitions.
 - Keep SwiftUI views focused on rendering and user interactions.
+- Extract shared behavior behind protocols where it improves testability, substitution, or boundary clarity.
 
 ### Naming conventions
 
