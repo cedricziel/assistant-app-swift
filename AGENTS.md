@@ -185,6 +185,12 @@ prettier --check <file>.md
 - Use `#if os(iOS)` / `#if os(macOS)` to preserve platform behavior.
 - Include `#Preview` blocks for key screens/components.
 
+### Apple Human Interface Guidelines (HIG)
+
+- Follow Apple Human Interface Guidelines for all UX and interaction design decisions.
+- For new UX flows, research the relevant HIG guidance before implementation and align behavior, layout, and copy with platform expectations.
+- If a design intentionally diverges from HIG, document the rationale in PR/commit notes.
+
 ### Data and privacy
 
 - Avoid displaying or logging raw API tokens.
