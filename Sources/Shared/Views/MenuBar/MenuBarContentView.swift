@@ -64,7 +64,7 @@ struct MenuBarContentView: View {
         .environmentObject(AccountStore(accounts: [PreviewData.account]))
         .environmentObject({
             let store = ChatStore()
-            store.ensureDefaultThread(for: PreviewData.account)
+            _ = store.ensureDefaultThread(for: PreviewData.account)
             return store
         }())
 }

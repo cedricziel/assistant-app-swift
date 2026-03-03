@@ -1,8 +1,8 @@
 import SwiftUI
 #if os(iOS)
-    import UIKit
+import UIKit
 #elseif os(macOS)
-    import AppKit
+import AppKit
 #endif
 
 struct ChatView: View {
@@ -27,7 +27,7 @@ struct ChatView: View {
                     .padding(.vertical, 16)
                 }
                 .background(Color(red: 0.96, green: 0.97, blue: 0.98))
-                .onChange(of: thread.messages.count) { _ in
+                .onChange(of: thread.messages.count) {
                     scrollToBottom(proxy: proxy)
                 }
                 .onAppear {
@@ -127,10 +127,10 @@ struct ChatView: View {
     private func copyTraceToPasteboard() {
         guard !traceText.isEmpty else { return }
         #if os(iOS)
-            UIPasteboard.general.string = traceText
+        UIPasteboard.general.string = traceText
         #elseif os(macOS)
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(traceText, forType: .string)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(traceText, forType: .string)
         #endif
     }
 }
