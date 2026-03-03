@@ -1,4 +1,9 @@
 import SwiftUI
+#if os(iOS)
+    import UIKit
+#elseif os(macOS)
+    import AppKit
+#endif
 
 struct ChatView: View {
     let account: AssistantAccount
@@ -6,7 +11,7 @@ struct ChatView: View {
 
     @EnvironmentObject private var chatStore: ChatStore
     @State private var composerText = ""
-    @State private var isShowingTrace = false
+    @State private var isShowingTraceSheet = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,16 +36,15 @@ struct ChatView: View {
             }
             Divider()
             if !traceEvents.isEmpty {
-                DisclosureGroup("Agent loop trace", isExpanded: $isShowingTrace) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(traceEvents) { event in
-                            Text("[\(event.attempt)] \(event.phase.rawValue): \(event.detail)")
-                                .font(.caption.monospaced())
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
+                HStack(spacing: 12) {
+                    Label("\(traceEvents.count) trace events", systemImage: "waveform.path.ecg")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("View trace") {
+                        isShowingTraceSheet = true
                     }
-                    .padding(.top, 4)
+                    .font(.caption.weight(.semibold))
                 }
                 .padding(.horizontal)
                 .padding(.vertical, 8)
@@ -49,17 +53,57 @@ struct ChatView: View {
             ChatInputBar(
                 text: $composerText,
                 isSending: chatStore.isSending(threadID: thread.id),
-                placeholder: "Message \(account.displayName)"
+                placeholder: "Message \(account.displayName)",
             ) { payload in
                 send(payload)
             }
             .padding()
         }
         .navigationTitle(thread.title)
+        .sheet(isPresented: $isShowingTraceSheet) {
+            NavigationStack {
+                List(traceEvents) { event in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(event.phase.rawValue)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text("Attempt \(event.attempt)")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                        Text(event.detail)
+                            .font(.footnote.monospaced())
+                            .textSelection(.enabled)
+                    }
+                    .padding(.vertical, 4)
+                }
+                .navigationTitle("Agent Loop Trace")
+                .toolbar {
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Copy") {
+                            copyTraceToPasteboard()
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Done") {
+                            isShowingTraceSheet = false
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
     }
 
     private var traceEvents: [AgentLoop.TraceEvent] {
         chatStore.latestLoopTrace(for: thread.id)
+    }
+
+    private var traceText: String {
+        traceEvents
+            .map { event in
+                "[\(event.attempt)] \(event.phase.rawValue): \(event.detail)"
+            }
+            .joined(separator: "\n")
     }
 
     private func send(_ text: String) {
@@ -78,6 +122,16 @@ struct ChatView: View {
                 proxy.scrollTo(messageID, anchor: .bottom)
             }
         }
+    }
+
+    private func copyTraceToPasteboard() {
+        guard !traceText.isEmpty else { return }
+        #if os(iOS)
+            UIPasteboard.general.string = traceText
+        #elseif os(macOS)
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(traceText, forType: .string)
+        #endif
     }
 }
 
