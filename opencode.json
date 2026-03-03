@@ -1,0 +1,26 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "formatter": {
+    "swift": {
+      "command": [
+        "swiftformat",
+        "$FILE"
+      ],
+      "extensions": [
+        ".swift"
+      ]
+    },
+    "markdown": {
+      "command": [
+        "sh",
+        "-lc",
+        "if command -v bunx >/dev/null 2>&1; then bunx prettier --write \"$FILE\"; elif command -v npx >/dev/null 2>&1; then npx prettier --write \"$FILE\"; else prettier --write \"$FILE\"; fi"
+      ],
+      "extensions": [
+        ".md",
+        ".mdx",
+        ".markdown"
+      ]
+    }
+  }
+}
