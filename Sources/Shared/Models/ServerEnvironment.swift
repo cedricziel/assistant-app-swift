@@ -31,6 +31,6 @@ struct ServerEnvironment: Identifiable, Hashable, Codable {
 extension ServerEnvironment {
     static let placeholder = ServerEnvironment(
         name: "Localhost",
-        baseURL: URL(string: "https://assistant.local")!
+        baseURL: URL(string: "https://assistant.local")!,
     )
 }

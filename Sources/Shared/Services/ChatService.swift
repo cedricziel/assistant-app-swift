@@ -10,7 +10,7 @@ struct ChatService {
     func sendMessage(
         _ content: String,
         for account: AssistantAccount,
-        in thread: ChatThread
+        in thread: ChatThread,
     ) async throws -> AgentLoop.Output {
         try await agentLoop.runTurn(message: content, account: account, thread: thread)
     }

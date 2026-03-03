@@ -8,7 +8,7 @@ Key capabilities:
 - macOS menu bar extra that mirrors the latest conversation for quick replies.
 - Chat interface that mirrors the existing web client: threaded history, composer, and assistant responses.
 - Multi-account aware data model. Every account is bound to a specific server URL so you can connect to several [`assistant`](https://github.com/cedricziel/assistant) deployments at the same time.
-- Login flow that persists account metadata in-memory today and is ready for persistence/back-end wiring.
+- Login flow with persisted account snapshots in `Application Support` and remote credentials in Keychain.
 - Remote account credentials are stored in the system Keychain instead of plaintext account snapshots.
 - OpenAI is available as a first-party remote provider using API-key auth.
 
@@ -25,7 +25,7 @@ assistant-app-swift/
 
 Shared state lives in `AccountStore` and `ChatStore`. `AccountStore` owns authentication state, while `ChatStore` keeps per-account threads and routes outgoing messages through a `ChatService`. `ChatService` now runs a shared agent loop that routes each turn to either local or remote assistant services based on account type.
 
-For a high-level view of the desired remote vs. local account types (including iCloud support), see [`docs/account-model.md`](docs/account-model.md).
+For the current + target account architecture (routing vs sync split, default iCloud behavior for Assistant-backed accounts, 1:N direct provider profiles, and migration plan), see [`docs/account-model.md`](docs/account-model.md).
 
 ## Bootstrapping
 
@@ -70,12 +70,12 @@ Required tooling:
 
 Account metadata is stored in `Application Support`, while remote credentials are written to Keychain.
 
-**Note:** Remote accounts already call the backend through `RemoteAssistantService`. Local account types currently use a placeholder local assistant implementation that echoes input; swap in your on-device model runtime when ready.
+**Note:** Assistant backend accounts already call the backend through `RemoteAssistantService`. Local and non-backend paths currently include placeholder behavior in places (for example `LocalAssistantService`), and the target model in `docs/account-model.md` captures the planned move to explicit routing + sync policies.
 
 ## Next steps
 
-- Persist accounts securely (Keychain + on-disk store) so users don't re-enter tokens.
-- Replace the `ChatService` stub with real streaming calls to the [`assistant`](https://github.com/cedricziel/assistant) backend.
-- Sync conversations by account/server to keep history consistent across devices.
+- Finish migrating account storage to the routing + sync model documented in [`docs/account-model.md`](docs/account-model.md).
+- Add multi-provider profile management (1:N direct providers per account, default provider, per-thread override).
+- Implement periodic and lifecycle-based refresh for iCloud-enabled conversations.
 - Flesh out the UI (message metadata, attachments, conversation settings, etc.) once backend capabilities are known.
 - Provide production-ready app icons in `Resources/Shared/Assets.xcassets/AppIcon.appiconset`.

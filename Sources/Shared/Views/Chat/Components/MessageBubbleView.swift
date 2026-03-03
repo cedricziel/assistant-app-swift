@@ -38,11 +38,11 @@ struct MessageBubbleView: View {
     private var bubbleBackground: some ShapeStyle {
         switch message.role {
         case .assistant:
-            return Color(red: 0.93, green: 0.95, blue: 0.99)
+            Color(red: 0.93, green: 0.95, blue: 0.99)
         case .system:
-            return Color(red: 0.85, green: 0.87, blue: 0.92)
+            Color(red: 0.85, green: 0.87, blue: 0.92)
         case .user:
-            return Color.accentColor
+            Color.accentColor
         }
     }
 }

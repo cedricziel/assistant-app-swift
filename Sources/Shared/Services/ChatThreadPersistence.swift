@@ -66,11 +66,11 @@ struct ChatThreadPersistence: ChatThreadPersisting {
     private func baseDirectory(for storage: AssistantAccount.ConversationStorage) throws -> URL {
         switch storage {
         case .deviceOnly:
-            return deviceSupportDirectory()
+            deviceSupportDirectory()
         case .iCloud:
-            return try iCloudSupportDirectory()
+            try iCloudSupportDirectory()
         case .remoteBackend:
-            return deviceSupportDirectory()
+            deviceSupportDirectory()
         }
     }
 

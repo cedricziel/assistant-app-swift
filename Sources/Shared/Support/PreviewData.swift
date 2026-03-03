@@ -6,12 +6,15 @@ enum PreviewData {
         displayName: "Preview",
         userHandle: "previewer",
         apiToken: "preview-token",
-        server: server
+        server: server,
     )
     static let thread: ChatThread = {
         let intro = ChatMessage.system("Preview bootstrap ready")
         let user = ChatMessage(role: .user, content: "How do I talk to the assistant?")
-        let assistant = ChatMessage(role: .assistant, content: "Just start typing and the backend will answer once wired up.")
+        let assistant = ChatMessage(
+            role: .assistant,
+            content: "Just start typing and the backend will answer once wired up.",
+        )
         return ChatThread(title: "Preview Conversation", messages: [intro, user, assistant])
     }()
 }
