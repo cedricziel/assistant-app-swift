@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install SwiftFormat
+        run: brew install swiftformat
+
+      - name: Lint Swift formatting
+        run: swiftformat --lint Sources/Shared
+
+      - name: Check Markdown formatting
+        run: npx --yes prettier --check "**/*.{md,mdx,markdown}"
+
+      - name: Build macOS app
+        run: >-
+          xcodebuild -project "Assistant.xcodeproj"
+          -scheme "Assistant macOS"
+          -configuration Debug
+          -destination 'platform=macOS'
+          build
+
+  build-ios-simulator:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build iOS app (Simulator)
+        run: >-
+          xcodebuild -project "Assistant.xcodeproj"
+          -scheme "Assistant iOS"
+          -configuration Debug
+          -destination 'platform=iOS Simulator,name=iPhone 16'
+          build
