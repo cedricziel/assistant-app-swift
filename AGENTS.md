@@ -185,6 +185,12 @@ prettier --check <file>.md
 - Use `#if os(iOS)` / `#if os(macOS)` to preserve platform behavior.
 - Include `#Preview` blocks for key screens/components.
 
+### Reactive view updates
+
+- Keep views reactive and side-effect safe: do not publish state changes during view update/render passes.
+- Avoid synchronous store mutations from `body` evaluation paths that trigger "Publishing changes from within view updates is not allowed" warnings.
+- Trigger mutations from explicit actions and lifecycle hooks (`Button` actions, `onAppear`, `onChange`, `task`) and route updates through `@MainActor` store APIs.
+
 ### Apple Human Interface Guidelines (HIG)
 
 - Follow Apple Human Interface Guidelines for all UX and interaction design decisions.
