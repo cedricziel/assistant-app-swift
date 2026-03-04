@@ -11,7 +11,13 @@ struct ChatService {
         _ content: String,
         for account: AssistantAccount,
         in thread: ChatThread,
+        onStream: AgentLoop.StreamHandler? = nil,
     ) async throws -> AgentLoop.Output {
-        try await agentLoop.runTurn(message: content, account: account, thread: thread)
+        try await agentLoop.runTurn(
+            message: content,
+            account: account,
+            thread: thread,
+            onStream: onStream,
+        )
     }
 }

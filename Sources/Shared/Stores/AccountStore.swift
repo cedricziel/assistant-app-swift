@@ -159,7 +159,7 @@ final class AccountStore: ObservableObject {
 
             persistSnapshot()
         } catch {
-            authenticationError = error.localizedDescription
+            authenticationError = Self.describeError(error)
             pendingOpenAIAuthorization = nil
         }
     }
@@ -345,5 +345,33 @@ extension AccountStore {
         )
         persistSnapshot()
         return accounts[index]
+    }
+
+    // MARK: - Error formatting
+
+    private static func describeError(_ error: Error) -> String {
+        if let decodingError = error as? DecodingError {
+            return describeDecodingError(decodingError)
+        }
+        return error.localizedDescription
+    }
+
+    private static func describeDecodingError(_ error: DecodingError) -> String {
+        switch error {
+        case let .keyNotFound(key, context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            let location = path.isEmpty ? "" : " at \(path)"
+            return "Unexpected response: missing field \"\(key.stringValue)\"\(location)."
+        case let .typeMismatch(type, context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            return "Unexpected response: wrong type for \"\(path)\" (expected \(type))."
+        case let .valueNotFound(type, context):
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            return "Unexpected response: null value for \"\(path)\" (expected \(type))."
+        case let .dataCorrupted(context):
+            return "Unexpected response: \(context.debugDescription)"
+        @unknown default:
+            return "Unexpected response format."
+        }
     }
 }

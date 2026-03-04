@@ -30,6 +30,7 @@ targets:
     platform: iOS
     sources:
       - path: Sources/Shared
+      - path: Sources/ShellXPC
     resources:
       - path: Resources/Shared
     dependencies:
@@ -68,15 +69,25 @@ targets:
     platform: macOS
     sources:
       - path: Sources/Shared
+      - path: Sources/ShellXPC
     resources:
       - path: Resources/Shared
     dependencies:
       - package: AssistantShared
+      - target: ShellAgent
+        embed: true
+        codeSign: true
+        copy:
+          destination: executables
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.assistant.app.macos
         MACOSX_DEPLOYMENT_TARGET: '26.2'
         CODE_SIGN_ENTITLEMENTS: Configurations/Assistant-macOS.entitlements
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+      configs:
+        Debug:
+          ENABLE_TESTABILITY: YES
     info:
       path: Configurations/Assistant-macOS-Info.plist
       properties:
@@ -84,6 +95,40 @@ targets:
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
         LSUIElement: false
+    postBuildScripts:
+      - name: Copy LaunchAgent plist
+        script: |
+          mkdir -p "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents"
+          cp "${SRCROOT}/Configurations/com.cedricziel.assistant.app.shell-agent.plist" \
+             "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents/"
+        basedOnDependencyAnalysis: false
+  AssistantTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/AssistantTests
+      - path: Sources/Shared
+      - path: Sources/ShellXPC
+    dependencies:
+      - package: AssistantShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.assistant.app.tests
+        MACOSX_DEPLOYMENT_TARGET: '26.2'
+        GENERATE_INFOPLIST_FILE: YES
+  ShellAgent:
+    type: tool
+    platform: macOS
+    sources:
+      - path: Sources/Agent
+      - path: Sources/ShellXPC
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.assistant.app.shell-agent
+        PRODUCT_NAME: com.cedricziel.assistant.app.shell-agent
+        MACOSX_DEPLOYMENT_TARGET: '26.2'
+        SKIP_INSTALL: YES
+        ENABLE_HARDENED_RUNTIME: YES
 schemes:
   Assistant iOS:
     shared: true
@@ -99,13 +144,36 @@ schemes:
         Assistant macOS: all
     run:
       config: Debug
+  ShellAgent:
+    shared: true
+    build:
+      targets:
+        ShellAgent: all
+    run:
+      config: Debug
+  AssistantTests:
+    shared: true
+    build:
+      targets:
+        AssistantTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - AssistantTests
   Assistant (All):
     shared: true
     build:
       targets:
         Assistant iOS: all
         Assistant macOS: all
+        ShellAgent: all
     run:
       config: Debug
+    test:
+      config: Debug
+      targets:
+        - AssistantTests
     archive:
       config: Release

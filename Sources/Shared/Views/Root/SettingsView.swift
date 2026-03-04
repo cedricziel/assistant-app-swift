@@ -3,6 +3,9 @@ import SwiftUI
 struct SettingsView: View {
     @EnvironmentObject private var accountStore: AccountStore
     @EnvironmentObject private var chatStore: ChatStore
+    @EnvironmentObject private var shellAgentService: ShellAgentService
+
+    @State private var agentError: String?
 
     var body: some View {
         Form {
@@ -35,10 +38,64 @@ struct SettingsView: View {
                     }
                 }
             }
+
+            #if os(macOS)
+            shellAgentSection
+            #endif
         }
         .frame(minWidth: 360, minHeight: 240)
         .navigationTitle("Assistant Settings")
+        .onAppear {
+            shellAgentService.refreshStatus()
+        }
+        .alert(
+            "Shell Agent Error",
+            isPresented: Binding(
+                get: { agentError != nil },
+                set: { if !$0 { agentError = nil } },
+            ),
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            if let agentError {
+                Text(agentError)
+            }
+        }
     }
+
+    #if os(macOS)
+    private var shellAgentSection: some View {
+        Section("Shell Agent") {
+            Toggle(
+                "Shell Agent",
+                isOn: Binding(
+                    get: { shellAgentService.isRegistered },
+                    set: { newValue in
+                        do {
+                            if newValue {
+                                try shellAgentService.register()
+                            } else {
+                                try shellAgentService.unregister()
+                            }
+                        } catch {
+                            agentError = error.localizedDescription
+                            shellAgentService.refreshStatus()
+                        }
+                    },
+                ),
+            )
+            .toggleStyle(.switch)
+
+            Text(
+                "Runs a background service that allows "
+                    + "Assistant to execute shell commands on "
+                    + "your Mac.",
+            )
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        }
+    }
+    #endif
 
     private func storageDescription(for account: AssistantAccount) -> String {
         switch account.conversationStorage {
@@ -68,4 +125,5 @@ struct SettingsView: View {
     SettingsView()
         .environmentObject(AccountStore(accounts: [PreviewData.account]))
         .environmentObject(ChatStore())
+        .environmentObject(ShellAgentService())
 }
