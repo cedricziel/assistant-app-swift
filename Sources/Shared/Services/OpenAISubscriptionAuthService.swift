@@ -39,7 +39,7 @@ struct OpenAISubscriptionAuthService {
     }
 
     private struct DeviceStartResponse: Decodable {
-        let deviceAuthID: String
+        let deviceAuthId: String
         let userCode: String
         let interval: String
     }
@@ -92,7 +92,7 @@ struct OpenAISubscriptionAuthService {
         return DeviceAuthorization(
             verificationURL: issuerURL.appending(path: "/codex/device"),
             userCode: payload.userCode,
-            deviceAuthID: payload.deviceAuthID,
+            deviceAuthID: payload.deviceAuthId,
             pollingInterval: interval,
         )
     }
