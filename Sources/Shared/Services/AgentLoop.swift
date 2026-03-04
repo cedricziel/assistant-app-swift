@@ -378,9 +378,9 @@ extension AgentLoop {
     }
 
     /// Tools that are safe to run without user approval.
-    private static let autoApprovedTools: Set<String> = ["datetime"]
+    static let autoApprovedTools: Set<String> = ["datetime"]
 
-    private func approveAndExecute(_ toolCall: ToolCall, context: ToolLoopContext) async -> ToolResult {
+    func approveAndExecute(_ toolCall: ToolCall, context: ToolLoopContext) async -> ToolResult {
         if Self.autoApprovedTools.contains(toolCall.name) {
             return await executeToolCall(toolCall)
         }
