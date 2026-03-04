@@ -10,7 +10,8 @@ final class AgentDelegate: NSObject, NSXPCListenerDelegate {
         let interface = NSXPCInterface(with: ShellExecutorProtocol.self)
 
         // Allow ShellExecutionResult in reply blocks.
-        let allowedClasses: Set<AnyHashable> = [ShellExecutionResult.self as AnyHashable]
+        let allowedClasses = NSSet(object: ShellExecutionResult
+            .self) as! Set<AnyHashable> // swiftlint:disable:this force_cast
         interface.setClasses(
             allowedClasses,
             for: #selector(ShellExecutorProtocol.execute(executablePath:arguments:environment:workingDirectory:reply:)),
