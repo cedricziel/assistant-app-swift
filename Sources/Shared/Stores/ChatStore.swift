@@ -86,6 +86,9 @@ final class ChatStore: ObservableObject {
         do {
             let output = try await chatService.sendMessage(trimmed, for: account, in: currentThread)
             var refreshed = thread(with: threadID, for: account) ?? currentThread
+            for intermediate in output.intermediateMessages {
+                refreshed = refreshed.appending(intermediate)
+            }
             refreshed = refreshed.appending(output.message)
             upsert(refreshed, for: account)
             loopTraceByThreadID[threadID] = output.trace

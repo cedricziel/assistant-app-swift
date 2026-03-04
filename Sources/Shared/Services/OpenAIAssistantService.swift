@@ -19,17 +19,65 @@ struct OpenAIAssistantService {
         }
     }
 
+    /// Response from a single generation call. May contain text, tool calls, or both.
+    struct GenerationResult {
+        let message: ChatMessage
+        let toolCalls: [ToolCall]
+    }
+
     private let apiModel: Model
     private let subscriptionModel = "gpt-5.3-codex"
     private let codexEndpoint = URL(string: "https://chatgpt.com/backend-api/codex/responses")!
     private let keychain = CredentialKeychain()
     private let authService = OpenAISubscriptionAuthService()
 
+    /// Bash tool definition passed to the Chat Completions API.
+    static let bashToolParam: ChatQuery.ChatCompletionToolParam = {
+        let schema = JSONSchema(
+            .type(.object),
+            .properties([
+                "command": JSONSchema(
+                    .type(.string),
+                    .description("The shell command to execute."),
+                ),
+                "working_directory": JSONSchema(
+                    .type(.string),
+                    .description("Optional working directory for the command."),
+                ),
+            ]),
+            .required(["command"]),
+            .additionalProperties(.boolean(false)),
+        )
+
+        return ChatQuery.ChatCompletionToolParam(
+            function: .init(
+                name: "bash",
+                description: "Execute a shell command on the user's machine and return stdout, stderr, and exit code.",
+                parameters: schema,
+                strict: true,
+            ),
+        )
+    }()
+
     init(apiModel: Model = "gpt-5-mini") {
         self.apiModel = apiModel
     }
 
+    // MARK: - Public API
+
     func send(text: String, account: AssistantAccount, conversationID _: UUID) async throws -> ChatMessage {
+        let result = try await generate(
+            messages: [.user(.init(content: .string(text)))],
+            account: account,
+        )
+        return result.message
+    }
+
+    /// Generate a response with full conversation history and tool support.
+    func generate(
+        messages: [ChatQuery.ChatCompletionMessageParam],
+        account: AssistantAccount,
+    ) async throws -> GenerationResult {
         guard let provider = account.selectedDirectProvider,
               provider.provider == .openAI
         else {
@@ -38,15 +86,34 @@ struct OpenAIAssistantService {
 
         switch provider.auth {
         case .apiKey:
-            return try await sendWithAPIKey(text: text, account: account)
+            return try await generateWithAPIKey(messages: messages, account: account)
         case .chatGPTSubscription:
-            return try await sendWithSubscription(text: text, account: account)
+            // Subscription path doesn't support tool calling yet.
+            let text = messages.compactMap { param -> String? in
+                if case let .user(msg) = param, case let .string(text) = msg.content { return text }
+                return nil
+            }.last ?? ""
+            let msg = try await sendWithSubscription(text: text, account: account)
+            return GenerationResult(message: msg, toolCalls: [])
         case .none:
             throw OpenAIServiceError.missingCredentials
         }
     }
 
-    private func sendWithAPIKey(text: String, account: AssistantAccount) async throws -> ChatMessage {
+    /// Submit tool results back to the model and get the next response.
+    func submitToolResults(
+        conversationMessages: [ChatQuery.ChatCompletionMessageParam],
+        account: AssistantAccount,
+    ) async throws -> GenerationResult {
+        try await generate(messages: conversationMessages, account: account)
+    }
+
+    // MARK: - Private
+
+    private func generateWithAPIKey(
+        messages: [ChatQuery.ChatCompletionMessageParam],
+        account: AssistantAccount,
+    ) async throws -> GenerationResult {
         let apiKey = account.apiToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !apiKey.isEmpty else {
             throw OpenAIServiceError.missingCredentials
@@ -54,17 +121,27 @@ struct OpenAIAssistantService {
 
         let client = OpenAI(apiToken: apiKey)
         let query = ChatQuery(
-            messages: [.user(.init(content: .string(text)))],
+            messages: messages,
             model: apiModel,
+            tools: [Self.bashToolParam],
         )
 
         let result = try await client.chats(query: query)
-        guard let content = result.choices.first?.message.content,
-              !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        else {
+        guard let choice = result.choices.first else {
             throw OpenAIServiceError.missingMessage
         }
-        return ChatMessage(role: .assistant, content: content)
+
+        let content = choice.message.content ?? ""
+        let toolCalls: [ToolCall] = (choice.message.toolCalls ?? []).map { chatToolCall in
+            ToolCall(id: chatToolCall.id, name: chatToolCall.function.name, arguments: chatToolCall.function.arguments)
+        }
+
+        let message = ChatMessage(
+            role: .assistant,
+            content: content,
+            toolCalls: toolCalls.isEmpty ? nil : toolCalls,
+        )
+        return GenerationResult(message: message, toolCalls: toolCalls)
     }
 
     private func sendWithSubscription(text: String, account: AssistantAccount) async throws -> ChatMessage {
