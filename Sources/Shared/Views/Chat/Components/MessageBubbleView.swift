@@ -1,5 +1,10 @@
 import AssistantShared
 import SwiftUI
+#if os(iOS)
+import UIKit
+#elseif os(macOS)
+import AppKit
+#endif
 
 struct MessageBubbleView: View {
     let message: ChatMessage
@@ -15,6 +20,13 @@ struct MessageBubbleView: View {
                 bubble
                     .foregroundStyle(.primary)
                 Spacer(minLength: 40)
+            }
+        }
+        .contextMenu {
+            Button {
+                copyContent()
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
             }
         }
         .transition(.move(edge: message.isFromCurrentUser ? .trailing : .leading).combined(with: .opacity))
@@ -41,6 +53,16 @@ struct MessageBubbleView: View {
         .padding(12)
         .background(bubbleBackground)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+    }
+
+    private func copyContent() {
+        guard !message.content.isEmpty else { return }
+        #if os(iOS)
+        UIPasteboard.general.string = message.content
+        #elseif os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(message.content, forType: .string)
+        #endif
     }
 
     private var bubbleBackground: some ShapeStyle {
