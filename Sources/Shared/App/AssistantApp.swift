@@ -10,6 +10,7 @@ struct AssistantApp: App {
                 .environmentObject(session.accountStore)
                 .environmentObject(session.chatStore)
                 .environmentObject(session.shellAgentService)
+                .environmentObject(session.toolApprovalCoordinator)
         }
         #if os(macOS)
         MenuBarExtra("Assistant", systemImage: "message.fill") {
@@ -17,6 +18,7 @@ struct AssistantApp: App {
                 .environmentObject(session.accountStore)
                 .environmentObject(session.chatStore)
                 .environmentObject(session.shellAgentService)
+                .environmentObject(session.toolApprovalCoordinator)
                 .frame(width: 340, height: 420)
                 .padding(.vertical)
         }
@@ -28,6 +30,7 @@ struct AssistantApp: App {
                 .environmentObject(session.accountStore)
                 .environmentObject(session.chatStore)
                 .environmentObject(session.shellAgentService)
+                .environmentObject(session.toolApprovalCoordinator)
         }
         #endif
     }

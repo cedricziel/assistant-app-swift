@@ -10,6 +10,7 @@ struct ChatView: View {
     let thread: ChatThread
 
     @EnvironmentObject private var chatStore: ChatStore
+    @EnvironmentObject private var toolApproval: ToolApprovalCoordinator
     @State private var composerText = ""
     @State private var isShowingTraceSheet = false
 
@@ -22,12 +23,25 @@ struct ChatView: View {
                             MessageBubbleView(message: message)
                                 .id(message.id)
                         }
+
+                        if let request = pendingApprovalForThread {
+                            ToolApprovalView(
+                                request: request,
+                                onApprove: { toolApproval.resolve(.approved) },
+                                onDeny: { toolApproval.resolve(.denied) },
+                            )
+                            .id("tool-approval-\(request.id)")
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        }
                     }
                     .padding(.horizontal)
                     .padding(.vertical, 16)
                 }
                 .background(Color(red: 0.96, green: 0.97, blue: 0.98))
                 .onChange(of: thread.messages.count) {
+                    scrollToBottom(proxy: proxy)
+                }
+                .onChange(of: toolApproval.pendingRequest?.id) {
                     scrollToBottom(proxy: proxy)
                 }
                 .onAppear {
@@ -94,6 +108,16 @@ struct ChatView: View {
         }
     }
 
+    /// The pending approval request for this thread, if any.
+    private var pendingApprovalForThread: ToolApprovalRequest? {
+        guard let request = toolApproval.pendingRequest,
+              request.threadID == thread.id
+        else {
+            return nil
+        }
+        return request
+    }
+
     private var traceEvents: [AgentLoop.TraceEvent] {
         chatStore.latestLoopTrace(for: thread.id)
     }
@@ -138,4 +162,5 @@ struct ChatView: View {
 #Preview {
     ChatView(account: PreviewData.account, thread: PreviewData.thread)
         .environmentObject(ChatStore())
+        .environmentObject(ToolApprovalCoordinator())
 }
