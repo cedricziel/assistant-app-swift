@@ -4,9 +4,17 @@ import Foundation
 final class ApplicationSession: ObservableObject {
     let accountStore: AccountStore
     let chatStore: ChatStore
+    let shellAgentService: ShellAgentService
 
-    init(accountStore: AccountStore = AccountStore(), chatStore: ChatStore = ChatStore()) {
+    init(
+        accountStore: AccountStore = AccountStore(),
+        shellAgentService: ShellAgentService = ShellAgentService(),
+    ) {
         self.accountStore = accountStore
-        self.chatStore = chatStore
+        self.shellAgentService = shellAgentService
+
+        let agentLoop = AgentLoop(shellAgentService: shellAgentService)
+        let chatService = ChatService(agentLoop: agentLoop)
+        chatStore = ChatStore(chatService: chatService)
     }
 }
