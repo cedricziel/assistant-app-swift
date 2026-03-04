@@ -31,6 +31,9 @@ struct OpenAIAssistantService {
         let toolCalls: [ToolCall]
     }
 
+    /// Callback invoked with accumulated content as streaming tokens arrive.
+    typealias StreamHandler = @Sendable (String) -> Void
+
     private let apiModel: Model
     private let subscriptionModel = "gpt-5.3-codex"
     private let codexEndpoint = URL(string: "https://chatgpt.com/backend-api/codex/responses")!
@@ -65,6 +68,24 @@ struct OpenAIAssistantService {
         )
     }()
 
+    /// Datetime tool definition passed to the Chat Completions API.
+    static let datetimeToolParam: ChatQuery.ChatCompletionToolParam = {
+        let schema = JSONSchema(
+            .type(.object),
+            .properties([:]),
+            .additionalProperties(.boolean(false)),
+        )
+
+        return ChatQuery.ChatCompletionToolParam(
+            function: .init(
+                name: "datetime",
+                description: "Returns the current date, time, and timezone on the user's machine.",
+                parameters: schema,
+                strict: true,
+            ),
+        )
+    }()
+
     init(apiModel: Model = "gpt-5-mini") {
         self.apiModel = apiModel
     }
@@ -83,6 +104,7 @@ struct OpenAIAssistantService {
     func generate(
         messages: [ChatQuery.ChatCompletionMessageParam],
         account: AssistantAccount,
+        onStream: StreamHandler? = nil,
     ) async throws -> GenerationResult {
         guard let provider = account.selectedDirectProvider,
               provider.provider == .openAI
@@ -99,7 +121,7 @@ struct OpenAIAssistantService {
                 if case let .user(msg) = param, case let .string(text) = msg.content { return text }
                 return nil
             }.last ?? ""
-            let msg = try await sendWithSubscription(text: text, account: account)
+            let msg = try await sendWithSubscription(text: text, account: account, onStream: onStream)
             return GenerationResult(message: msg, toolCalls: [])
         case .none:
             throw OpenAIServiceError.missingCredentials
@@ -129,7 +151,7 @@ struct OpenAIAssistantService {
         let query = ChatQuery(
             messages: messages,
             model: apiModel,
-            tools: [Self.bashToolParam],
+            tools: [Self.bashToolParam, Self.datetimeToolParam],
         )
 
         let result = try await client.chats(query: query)
@@ -150,7 +172,11 @@ struct OpenAIAssistantService {
         return GenerationResult(message: message, toolCalls: toolCalls)
     }
 
-    private func sendWithSubscription(text: String, account: AssistantAccount) async throws -> ChatMessage {
+    private func sendWithSubscription(
+        text: String,
+        account: AssistantAccount,
+        onStream: StreamHandler? = nil,
+    ) async throws -> ChatMessage {
         let subscription = try await loadValidSubscriptionCredential(for: account)
 
         var request = URLRequest(url: codexEndpoint)
@@ -188,7 +214,7 @@ struct OpenAIAssistantService {
             throw OpenAIServiceError.httpError(statusCode: statusCode, body: String(errorBody.prefix(300)))
         }
 
-        let reply = try await collectSSEText(from: bytes)
+        let reply = try await collectSSEText(from: bytes, onDelta: onStream)
         guard !reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw OpenAIServiceError.unparsableResponse(body: "(empty stream)")
         }
@@ -224,6 +250,7 @@ struct OpenAIAssistantService {
     /// Reads an SSE byte stream and accumulates output text deltas.
     private func collectSSEText(
         from bytes: URLSession.AsyncBytes,
+        onDelta: (@Sendable (String) -> Void)? = nil,
     ) async throws -> String {
         var result = ""
         for try await line in bytes.lines {
@@ -238,43 +265,10 @@ struct OpenAIAssistantService {
                let delta = json["delta"] as? String
             {
                 result += delta
+                onDelta?(result)
             }
         }
         return result
-    }
-
-    private func extractResponseText(from data: Data) -> String? {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return nil
-        }
-
-        if let text = json["output_text"] as? String, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return text
-        }
-
-        if let output = json["output"] as? [[String: Any]] {
-            for item in output {
-                guard let content = item["content"] as? [[String: Any]] else { continue }
-                for part in content {
-                    if let text = part["text"] as? String,
-                       !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    {
-                        return text
-                    }
-                }
-            }
-        }
-
-        if let choices = json["choices"] as? [[String: Any]],
-           let firstChoice = choices.first,
-           let message = firstChoice["message"] as? [String: Any],
-           let content = message["content"] as? String,
-           !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        {
-            return content
-        }
-
-        return nil
     }
 
     /// Truncated preview of response body for error diagnostics.

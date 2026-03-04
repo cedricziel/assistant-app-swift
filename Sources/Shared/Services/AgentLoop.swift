@@ -89,6 +89,9 @@ struct AgentLoop {
     /// Returns the user's decision. If nil, tool calls are denied by default.
     typealias ToolApprovalHandler = @Sendable (ToolApprovalRequest) async -> ToolApprovalRequest.Decision
 
+    /// Callback invoked with accumulated content as streaming tokens arrive.
+    typealias StreamHandler = @Sendable (String) -> Void
+
     private let remoteService: RemoteAssistantService
     private let openAIService: OpenAIAssistantService
     private let localService: LocalAssistantService
@@ -112,7 +115,12 @@ struct AgentLoop {
         self.policy = policy
     }
 
-    func runTurn(message: String, account: AssistantAccount, thread: ChatThread) async throws -> Output {
+    func runTurn(
+        message: String,
+        account: AssistantAccount,
+        thread: ChatThread,
+        onStream: StreamHandler? = nil,
+    ) async throws -> Output {
         let backend = selectBackend(for: account)
         var trace: [TraceEvent] = []
 
@@ -133,6 +141,7 @@ struct AgentLoop {
                         thread: thread,
                         trace: &trace,
                         attempt: attempt,
+                        onStream: onStream,
                     )
                 }
                 let response = try await generate(with: backend, message: message, account: account, thread: thread)
@@ -165,6 +174,7 @@ struct AgentLoop {
         thread: ChatThread,
         trace: inout [TraceEvent],
         attempt: Int,
+        onStream: StreamHandler? = nil,
     ) async throws -> Output {
         var context = ToolLoopContext(trace: trace, intermediateMessages: [], attempt: attempt, threadID: thread.id)
         let result = try await runOpenAIToolLoop(
@@ -172,6 +182,7 @@ struct AgentLoop {
             account: account,
             thread: thread,
             context: &context,
+            onStream: onStream,
         )
         context.trace.append(TraceEvent(phase: .completed, detail: "Turn completed.", attempt: attempt))
         trace = context.trace
@@ -256,6 +267,7 @@ extension AgentLoop {
         account: AssistantAccount,
         thread: ChatThread,
         context: inout ToolLoopContext,
+        onStream: StreamHandler? = nil,
     ) async throws -> ChatMessage {
         var conversationParams = buildConversationParams(from: thread)
         conversationParams.append(.user(.init(content: .string(userMessage))))
@@ -264,6 +276,7 @@ extension AgentLoop {
             conversationParams: &conversationParams,
             account: account,
             context: &context,
+            onStream: onStream,
         )
     }
 
@@ -303,10 +316,15 @@ extension AgentLoop {
         conversationParams: inout [ChatQuery.ChatCompletionMessageParam],
         account: AssistantAccount,
         context: inout ToolLoopContext,
+        onStream: StreamHandler? = nil,
     ) async throws -> ChatMessage {
         var roundTrip = 0
         while roundTrip < policy.maxToolRoundTrips {
-            let result = try await openAIService.generate(messages: conversationParams, account: account)
+            let result = try await openAIService.generate(
+                messages: conversationParams,
+                account: account,
+                onStream: onStream,
+            )
 
             guard !result.toolCalls.isEmpty else {
                 context.trace.append(TraceEvent(
@@ -359,7 +377,13 @@ extension AgentLoop {
         }
     }
 
+    /// Tools that are safe to run without user approval.
+    private static let autoApprovedTools: Set<String> = ["datetime"]
+
     private func approveAndExecute(_ toolCall: ToolCall, context: ToolLoopContext) async -> ToolResult {
+        if Self.autoApprovedTools.contains(toolCall.name) {
+            return await executeToolCall(toolCall)
+        }
         guard let handler = toolApprovalHandler else {
             return ToolResult(
                 toolCallID: toolCall.id,
@@ -378,13 +402,27 @@ extension AgentLoop {
     }
 
     private func executeToolCall(_ toolCall: ToolCall) async -> ToolResult {
-        guard toolCall.name == "bash" else {
+        switch toolCall.name {
+        case "bash":
+            guard let args = toolCall.bashArguments else {
+                return ToolResult(toolCallID: toolCall.id, output: "Failed to decode bash arguments.", isError: true)
+            }
+            return await executeBashToolCall(id: toolCall.id, args: args)
+        case "datetime":
+            return executeDatetimeToolCall(id: toolCall.id)
+        default:
             return ToolResult(toolCallID: toolCall.id, output: "Unknown tool: \(toolCall.name)", isError: true)
         }
-        guard let args = toolCall.bashArguments else {
-            return ToolResult(toolCallID: toolCall.id, output: "Failed to decode bash arguments.", isError: true)
-        }
-        return await executeBashToolCall(id: toolCall.id, args: args)
+    }
+
+    private func executeDatetimeToolCall(id: String) -> ToolResult {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss zzz"
+        formatter.locale = Locale.current
+        let now = formatter.string(from: Date())
+        let zone = TimeZone.current
+        let output = "\(now) (\(zone.identifier), UTC\(zone.offsetDescription))"
+        return ToolResult(toolCallID: id, output: output, isError: false)
     }
 
     private func executeBashToolCall(id: String, args: BashArguments) async -> ToolResult {
