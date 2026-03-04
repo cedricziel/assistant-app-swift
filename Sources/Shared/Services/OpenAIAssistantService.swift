@@ -5,7 +5,9 @@ struct OpenAIAssistantService {
     enum OpenAIServiceError: LocalizedError {
         case unsupportedAccount
         case missingCredentials
-        case missingMessage
+        case emptyChoices(model: String)
+        case httpError(statusCode: Int, body: String)
+        case unparsableResponse(body: String)
 
         var errorDescription: String? {
             switch self {
@@ -13,8 +15,12 @@ struct OpenAIAssistantService {
                 "The selected account does not support OpenAI messaging."
             case .missingCredentials:
                 "OpenAI credentials are missing."
-            case .missingMessage:
-                "OpenAI did not return a message."
+            case let .emptyChoices(model):
+                "OpenAI returned no choices for model \(model)."
+            case let .httpError(statusCode, body):
+                "OpenAI returned HTTP \(statusCode): \(body)"
+            case let .unparsableResponse(body):
+                "Could not extract message from response: \(body)"
             }
         }
     }
@@ -128,7 +134,7 @@ struct OpenAIAssistantService {
 
         let result = try await client.chats(query: query)
         guard let choice = result.choices.first else {
-            throw OpenAIServiceError.missingMessage
+            throw OpenAIServiceError.emptyChoices(model: apiModel)
         }
 
         let content = choice.message.content ?? ""
@@ -171,12 +177,14 @@ struct OpenAIAssistantService {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)
+        let preview = responsePreview(data)
         guard let httpResponse = response as? HTTPURLResponse, 200 ..< 300 ~= httpResponse.statusCode else {
-            throw OpenAIServiceError.missingMessage
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            throw OpenAIServiceError.httpError(statusCode: statusCode, body: preview)
         }
 
         guard let reply = extractResponseText(from: data) else {
-            throw OpenAIServiceError.missingMessage
+            throw OpenAIServiceError.unparsableResponse(body: preview)
         }
         return ChatMessage(role: .assistant, content: reply)
     }
@@ -239,5 +247,11 @@ struct OpenAIAssistantService {
         }
 
         return nil
+    }
+
+    /// Truncated preview of response body for error diagnostics.
+    private func responsePreview(_ data: Data) -> String {
+        let raw = String(data: data.prefix(300), encoding: .utf8) ?? "(binary)"
+        return raw.count < data.count ? raw + "..." : raw
     }
 }
