@@ -173,19 +173,24 @@ struct OpenAIAssistantService {
                     "text": text,
                 ]],
             ]],
+            "stream": true,
             "store": false,
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let preview = responsePreview(data)
+        let (bytes, response) = try await URLSession.shared.bytes(for: request)
         guard let httpResponse = response as? HTTPURLResponse, 200 ..< 300 ~= httpResponse.statusCode else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
-            throw OpenAIServiceError.httpError(statusCode: statusCode, body: preview)
+            var errorBody = ""
+            for try await line in bytes.lines {
+                errorBody += line
+            }
+            throw OpenAIServiceError.httpError(statusCode: statusCode, body: String(errorBody.prefix(300)))
         }
 
-        guard let reply = extractResponseText(from: data) else {
-            throw OpenAIServiceError.unparsableResponse(body: preview)
+        let reply = try await collectSSEText(from: bytes)
+        guard !reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw OpenAIServiceError.unparsableResponse(body: "(empty stream)")
         }
         return ChatMessage(role: .assistant, content: reply)
     }
@@ -214,6 +219,28 @@ struct OpenAIAssistantService {
         let payload = try JSONEncoder().encode(RemoteCredential.openAISubscription(updated))
         try keychain.setData(payload, for: account.id)
         return updated
+    }
+
+    /// Reads an SSE byte stream and accumulates output text deltas.
+    private func collectSSEText(
+        from bytes: URLSession.AsyncBytes,
+    ) async throws -> String {
+        var result = ""
+        for try await line in bytes.lines {
+            guard line.hasPrefix("data: ") else { continue }
+            let payload = String(line.dropFirst(6))
+            if payload == "[DONE]" { break }
+            guard let data = payload.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let type = json["type"] as? String
+            else { continue }
+            if type == "response.output_text.delta",
+               let delta = json["delta"] as? String
+            {
+                result += delta
+            }
+        }
+        return result
     }
 
     private func extractResponseText(from data: Data) -> String? {
