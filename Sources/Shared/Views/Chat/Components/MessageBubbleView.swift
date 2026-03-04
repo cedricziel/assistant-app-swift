@@ -26,6 +26,14 @@ struct MessageBubbleView: View {
                 Text("System")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+            } else if message.role == .tool {
+                Text("Tool Result")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if message.hasToolCalls {
+                Text("Tool Call")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             Markdown(message.content)
                 .font(.body)
@@ -43,6 +51,8 @@ struct MessageBubbleView: View {
             Color(red: 0.85, green: 0.87, blue: 0.92)
         case .user:
             Color.accentColor
+        case .tool:
+            Color(red: 0.90, green: 0.92, blue: 0.88)
         }
     }
 }
