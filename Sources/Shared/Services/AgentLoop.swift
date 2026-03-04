@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import OpenAI
 
@@ -84,10 +85,15 @@ struct AgentLoop {
         }
     }
 
+    /// Closure invoked to request user approval before executing a tool call.
+    /// Returns the user's decision. If nil, tool calls are denied by default.
+    typealias ToolApprovalHandler = @Sendable (ToolApprovalRequest) async -> ToolApprovalRequest.Decision
+
     private let remoteService: RemoteAssistantService
     private let openAIService: OpenAIAssistantService
     private let localService: LocalAssistantService
     private let shellAgentService: ShellAgentService?
+    private let toolApprovalHandler: ToolApprovalHandler?
     private let policy: Policy
 
     init(
@@ -95,12 +101,14 @@ struct AgentLoop {
         openAIService: OpenAIAssistantService = OpenAIAssistantService(),
         localService: LocalAssistantService = LocalAssistantService(),
         shellAgentService: ShellAgentService? = nil,
+        toolApprovalHandler: ToolApprovalHandler? = nil,
         policy: Policy = Policy(),
     ) {
         self.remoteService = remoteService
         self.openAIService = openAIService
         self.localService = localService
         self.shellAgentService = shellAgentService
+        self.toolApprovalHandler = toolApprovalHandler
         self.policy = policy
     }
 
@@ -158,7 +166,7 @@ struct AgentLoop {
         trace: inout [TraceEvent],
         attempt: Int,
     ) async throws -> Output {
-        var context = ToolLoopContext(trace: trace, intermediateMessages: [], attempt: attempt)
+        var context = ToolLoopContext(trace: trace, intermediateMessages: [], attempt: attempt, threadID: thread.id)
         let result = try await runOpenAIToolLoop(
             userMessage: message,
             account: account,
@@ -240,6 +248,7 @@ extension AgentLoop {
         var trace: [TraceEvent]
         var intermediateMessages: [ChatMessage]
         let attempt: Int
+        let threadID: ChatThread.ID
     }
 
     func runOpenAIToolLoop(
@@ -338,12 +347,10 @@ extension AgentLoop {
         context: inout ToolLoopContext,
     ) async {
         for toolCall in toolCalls {
-            let toolResult = await executeToolCall(toolCall)
+            let toolResult = await approveAndExecute(toolCall, context: context)
             let toolMessage = ChatMessage.toolResult(callID: toolCall.id, output: toolResult.output)
             context.intermediateMessages.append(toolMessage)
-            conversationParams.append(
-                .tool(.init(content: .textContent(toolResult.output), toolCallId: toolCall.id)),
-            )
+            conversationParams.append(.tool(.init(content: .textContent(toolResult.output), toolCallId: toolCall.id)))
             context.trace.append(TraceEvent(
                 phase: .acting,
                 detail: "Tool \(toolCall.name) [\(toolCall.id)] \(toolResult.isError ? "failed" : "succeeded").",
@@ -352,16 +359,30 @@ extension AgentLoop {
         }
     }
 
+    private func approveAndExecute(_ toolCall: ToolCall, context: ToolLoopContext) async -> ToolResult {
+        guard let handler = toolApprovalHandler else {
+            return ToolResult(
+                toolCallID: toolCall.id,
+                output: "Tool execution denied: no approval handler configured.",
+                isError: true,
+            )
+        }
+        let request = ToolApprovalRequest(id: toolCall.id, toolCall: toolCall, threadID: context.threadID)
+        let decision = await handler(request)
+        switch decision {
+        case .approved:
+            return await executeToolCall(toolCall)
+        case .denied:
+            return ToolResult(toolCallID: toolCall.id, output: "Tool execution denied by user.", isError: true)
+        }
+    }
+
     private func executeToolCall(_ toolCall: ToolCall) async -> ToolResult {
         guard toolCall.name == "bash" else {
             return ToolResult(toolCallID: toolCall.id, output: "Unknown tool: \(toolCall.name)", isError: true)
         }
         guard let args = toolCall.bashArguments else {
-            return ToolResult(
-                toolCallID: toolCall.id,
-                output: "Failed to decode bash arguments from: \(toolCall.arguments)",
-                isError: true,
-            )
+            return ToolResult(toolCallID: toolCall.id, output: "Failed to decode bash arguments.", isError: true)
         }
         return await executeBashToolCall(id: toolCall.id, args: args)
     }
@@ -393,3 +414,5 @@ extension AgentLoop {
         #endif
     }
 }
+
+// swiftlint:enable file_length
