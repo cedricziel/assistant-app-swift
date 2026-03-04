@@ -5,6 +5,7 @@ final class ChatStore: ObservableObject {
     @Published private var threadsByAccount: [AssistantAccount.ID: [ChatThread]] = [:]
     @Published private var pendingThreadIDs: Set<ChatThread.ID> = []
     @Published private var loopTraceByThreadID: [ChatThread.ID: [AgentLoop.TraceEvent]] = [:]
+    @Published private var streamingContentByThreadID: [ChatThread.ID: String] = [:]
     @Published var persistenceError: String?
 
     private let chatService: ChatService
@@ -65,6 +66,18 @@ final class ChatStore: ObservableObject {
         loopTraceByThreadID[threadID] ?? []
     }
 
+    func streamingContent(for threadID: ChatThread.ID) -> String? {
+        streamingContentByThreadID[threadID]
+    }
+
+    func updateStreamingContent(_ content: String, for threadID: ChatThread.ID) {
+        streamingContentByThreadID[threadID] = content
+    }
+
+    func clearStreamingContent(for threadID: ChatThread.ID) {
+        streamingContentByThreadID[threadID] = nil
+    }
+
     func send(message: String, for account: AssistantAccount) async {
         let thread = latestThread(for: account) ?? ensureDefaultThread(for: account)
         await send(message: message, in: thread.id, for: account)
@@ -81,10 +94,25 @@ final class ChatStore: ObservableObject {
         upsert(currentThread, for: account)
 
         pendingThreadIDs.insert(threadID)
-        defer { pendingThreadIDs.remove(threadID) }
+        defer {
+            pendingThreadIDs.remove(threadID)
+            clearStreamingContent(for: threadID)
+        }
+
+        let streamHandler: AgentLoop.StreamHandler = { [weak self] content in
+            Task { @MainActor [weak self] in
+                self?.updateStreamingContent(content, for: threadID)
+            }
+        }
 
         do {
-            let output = try await chatService.sendMessage(trimmed, for: account, in: currentThread)
+            let output = try await chatService.sendMessage(
+                trimmed,
+                for: account,
+                in: currentThread,
+                onStream: streamHandler,
+            )
+            clearStreamingContent(for: threadID)
             var refreshed = thread(with: threadID, for: account) ?? currentThread
             for intermediate in output.intermediateMessages {
                 refreshed = refreshed.appending(intermediate)
