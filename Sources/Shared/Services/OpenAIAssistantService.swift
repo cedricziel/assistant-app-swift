@@ -165,6 +165,7 @@ struct OpenAIAssistantService {
 
         let body: [String: Any] = [
             "model": subscriptionModel,
+            "instructions": "You are a helpful assistant.",
             "input": [[
                 "role": "user",
                 "content": [[
