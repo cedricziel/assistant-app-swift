@@ -86,6 +86,15 @@ struct OpenAIAssistantService {
         )
     }()
 
+    /// Current datetime string for injection into system instructions.
+    static var currentDatetimeString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss zzz"
+        formatter.locale = Locale.current
+        let zone = TimeZone.current
+        return "\(formatter.string(from: Date())) (\(zone.identifier), UTC\(zone.offsetDescription))"
+    }
+
     init(apiModel: Model = "gpt-5-mini") {
         self.apiModel = apiModel
     }
@@ -191,7 +200,7 @@ struct OpenAIAssistantService {
 
         let body: [String: Any] = [
             "model": subscriptionModel,
-            "instructions": "You are a helpful assistant.",
+            "instructions": "You are a helpful assistant. Current datetime: \(Self.currentDatetimeString).",
             "input": [[
                 "role": "user",
                 "content": [[
