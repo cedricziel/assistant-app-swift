@@ -3,7 +3,7 @@ import SwiftUI
 struct ChatSceneView: View {
     @EnvironmentObject private var accountStore: AccountStore
     @EnvironmentObject private var chatStore: ChatStore
-    @Binding var showAccountSheet: Bool
+    @Binding var showSettings: Bool
 
     @State private var selectedThreadID: ChatThread.ID?
 
@@ -31,11 +31,6 @@ struct ChatSceneView: View {
                             accountStore.selectAccount(account)
                             selectDefaultThread()
                         }
-                    }
-                    Button {
-                        showAccountSheet = true
-                    } label: {
-                        Label("Add account", systemImage: "plus")
                     }
                 }
 
@@ -80,9 +75,9 @@ struct ChatSceneView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
-                    showAccountSheet = true
+                    showSettings = true
                 } label: {
-                    Label("Manage accounts", systemImage: "person.crop.circle.badge.plus")
+                    Label("Settings", systemImage: "gearshape")
                 }
             }
         }
@@ -105,7 +100,7 @@ struct ChatSceneView: View {
 }
 
 #Preview {
-    ChatSceneView(showAccountSheet: .constant(false))
+    ChatSceneView(showSettings: .constant(false))
         .environmentObject({
             let store = AccountStore(accounts: [PreviewData.account])
             store.activeAccountID = PreviewData.account.id

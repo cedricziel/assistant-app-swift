@@ -6,36 +6,28 @@ struct SettingsView: View {
     @EnvironmentObject private var shellAgentService: ShellAgentService
 
     @State private var agentError: String?
+    @State private var accountPendingRemoval: AssistantAccount?
+    @State private var showingAddAccount = false
 
     var body: some View {
-        Form {
+        List {
             Section("Accounts") {
                 if accountStore.accounts.isEmpty {
-                    Text("No accounts connected")
-                        .foregroundStyle(.secondary)
+                    ContentUnavailableView(
+                        "No Accounts",
+                        systemImage: "person.crop.circle.badge.plus",
+                        description: Text("Add an account to start a conversation."),
+                    )
                 } else {
                     ForEach(accountStore.accounts) { account in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(account.displayName)
-                                    .font(.headline)
-                                Text(account.server.displayName)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                Text(routingDescription(for: account))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Text(storageDescription(for: account))
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            }
-                            Spacer()
-                            Button("Remove", role: .destructive) {
-                                chatStore.removeData(for: account)
-                                accountStore.removeAccount(account)
-                            }
-                        }
+                        accountRow(for: account)
                     }
+                }
+
+                Button {
+                    showingAddAccount = true
+                } label: {
+                    Label("Add Account", systemImage: "plus.circle")
                 }
             }
 
@@ -43,24 +35,110 @@ struct SettingsView: View {
             shellAgentSection
             #endif
         }
-        .frame(minWidth: 360, minHeight: 240)
-        .navigationTitle("Assistant Settings")
-        .onAppear {
-            shellAgentService.refreshStatus()
+        .navigationTitle("Settings")
+        #if os(iOS)
+            .listStyle(.insetGrouped)
+        #else
+            .listStyle(.inset)
+        #endif
+            .frame(minWidth: 480, minHeight: 360)
+            .onAppear {
+                shellAgentService.refreshStatus()
+            }
+            .sheet(isPresented: $showingAddAccount) {
+                NavigationStack {
+                    LoginView(mode: .additional)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Close") {
+                                    showingAddAccount = false
+                                }
+                            }
+                        }
+                }
+                .presentationDetents([.fraction(0.85), .large])
+            }
+            .confirmationDialog(
+                "Remove Account?",
+                isPresented: Binding(
+                    get: { accountPendingRemoval != nil },
+                    set: { isPresented in
+                        if !isPresented {
+                            accountPendingRemoval = nil
+                        }
+                    },
+                ),
+                titleVisibility: .visible,
+                presenting: accountPendingRemoval,
+            ) { account in
+                Button("Remove \(account.displayName)", role: .destructive) {
+                    removeAccount(account)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: { account in
+                Text("\(account.displayName) and its local conversations will be removed from this device.")
+            }
+            .alert(
+                "Shell Agent Error",
+                isPresented: Binding(
+                    get: { agentError != nil },
+                    set: { if !$0 { agentError = nil } },
+                ),
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                if let agentError {
+                    Text(agentError)
+                }
+            }
+    }
+
+    private func accountRow(for account: AssistantAccount) -> some View {
+        Button {
+            accountStore.selectAccount(account)
+        } label: {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(account.displayName)
+                        .font(.headline)
+                    Text(account.server.displayName)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    Text(routingDescription(for: account))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(storageDescription(for: account))
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+                Spacer()
+                if accountStore.activeAccountID == account.id {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.tint)
+                        .accessibilityLabel("Active account")
+                }
+            }
+            .contentShape(Rectangle())
         }
-        .alert(
-            "Shell Agent Error",
-            isPresented: Binding(
-                get: { agentError != nil },
-                set: { if !$0 { agentError = nil } },
-            ),
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            if let agentError {
-                Text(agentError)
+        .buttonStyle(.plain)
+        .swipeActions {
+            Button(role: .destructive) {
+                accountPendingRemoval = account
+            } label: {
+                Label("Remove", systemImage: "trash")
             }
         }
+        .contextMenu {
+            Button("Remove Account", role: .destructive) {
+                accountPendingRemoval = account
+            }
+        }
+    }
+
+    private func removeAccount(_ account: AssistantAccount) {
+        chatStore.removeData(for: account)
+        accountStore.removeAccount(account)
+        accountPendingRemoval = nil
     }
 
     #if os(macOS)
@@ -86,13 +164,9 @@ struct SettingsView: View {
             )
             .toggleStyle(.switch)
 
-            Text(
-                "Runs a background service that allows "
-                    + "Assistant to execute shell commands on "
-                    + "your Mac.",
-            )
-            .font(.callout)
-            .foregroundStyle(.secondary)
+            Text("Runs a background service that lets Assistant execute shell commands on your Mac.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
 
             shellAgentStatusView
         }
@@ -101,18 +175,23 @@ struct SettingsView: View {
     @ViewBuilder
     private var shellAgentStatusView: some View {
         switch shellAgentService.agentStatus {
+        case .enabled:
+            Label("Enabled", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .font(.callout)
+        case .notRegistered:
+            Label("Disabled", systemImage: "minus.circle")
+                .foregroundStyle(.secondary)
+                .font(.callout)
         case .requiresApproval:
             VStack(alignment: .leading, spacing: 4) {
                 Label("Requires Approval", systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.orange)
                     .font(.callout)
-                Text(
-                    "Open System Settings \u{2192} General \u{2192} Login Items "
-                        + "and enable the agent for this app.",
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                Button("Open Login Items\u{2026}") {
+                Text("Open System Settings > General > Login Items and enable the agent for this app.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Open Login Items") {
                     openLoginItemsSettings()
                 }
                 .font(.caption)
@@ -124,7 +203,7 @@ struct SettingsView: View {
             )
             .foregroundStyle(.red)
             .font(.callout)
-        case .enabled, .notRegistered, .unknown:
+        case .unknown:
             EmptyView()
         }
     }
