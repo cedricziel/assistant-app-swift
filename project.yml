@@ -99,7 +99,7 @@ targets:
       - name: Copy LaunchAgent plist
         script: |
           mkdir -p "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents"
-          cp "${SRCROOT}/Configurations/com.cedricziel.assistant.app.shell-agent.plist" \
+          cp "${SRCROOT}/Configurations/com.cedricziel.assistant.app.macos.shell-agent.plist" \
              "${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/Library/LaunchAgents/"
         basedOnDependencyAnalysis: false
   AssistantTests:
@@ -124,11 +124,13 @@ targets:
       - path: Sources/ShellXPC
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.assistant.app.shell-agent
-        PRODUCT_NAME: com.cedricziel.assistant.app.shell-agent
+        PRODUCT_BUNDLE_IDENTIFIER: com.cedricziel.assistant.app.macos.shell-agent
+        PRODUCT_NAME: com.cedricziel.assistant.app.macos.shell-agent
         MACOSX_DEPLOYMENT_TARGET: '26.2'
         SKIP_INSTALL: YES
         ENABLE_HARDENED_RUNTIME: YES
+        GENERATE_INFOPLIST_FILE: YES
+        CREATE_INFOPLIST_SECTION_IN_BINARY: YES
 schemes:
   Assistant iOS:
     shared: true

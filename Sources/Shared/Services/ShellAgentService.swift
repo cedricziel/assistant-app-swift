@@ -1,7 +1,13 @@
 import Foundation
+import OSLog
 #if os(macOS)
 import ServiceManagement
 #endif
+
+private let logger = Logger(
+    subsystem: "com.cedricziel.assistant.app",
+    category: "ShellAgentService",
+)
 
 /// Manages the lifecycle of the shell agent and provides an XPC
 /// connection for executing commands from the sandboxed main app.
@@ -11,32 +17,87 @@ import ServiceManagement
 final class ShellAgentService: ObservableObject {
     enum AgentError: LocalizedError {
         case agentNotAvailable
+        case agentNotFound
+        case agentRequiresApproval
         case connectionFailed(String)
         case executionFailed(String)
+        case registrationFailed(String, underlyingStatus: String)
 
         var errorDescription: String? {
             switch self {
             case .agentNotAvailable:
                 "Shell agent is not available on this platform."
+            case .agentNotFound:
+                "Shell agent binary or plist was not found in the app bundle. "
+                    + "Try rebuilding the app with a clean build (Product > Clean Build Folder)."
+            case .agentRequiresApproval:
+                "Shell agent requires approval. Open System Settings > General > Login Items "
+                    + "and enable the agent for this app."
             case let .connectionFailed(detail):
                 "Failed to connect to shell agent: \(detail)"
             case let .executionFailed(detail):
                 "Command execution failed: \(detail)"
+            case let .registrationFailed(detail, underlyingStatus):
+                "Registration failed (\(underlyingStatus)): \(detail)"
             }
         }
     }
 
+    /// Human-readable status of the agent service (macOS only).
+    enum AgentStatus: String {
+        case enabled = "Enabled"
+        case requiresApproval = "Requires Approval"
+        case notRegistered = "Not Registered"
+        case notFound = "Not Found in Bundle"
+        case unknown = "Unknown"
+    }
+
     #if os(macOS)
     @Published private(set) var isRegistered = false
+    @Published private(set) var agentStatus: AgentStatus = .notRegistered
 
-    private let agentPlistName = "com.cedricziel.assistant.app.shell-agent.plist"
+    private let agentPlistName = "com.cedricziel.assistant.app.macos.shell-agent.plist"
     private var connection: NSXPCConnection?
 
     /// Register the shell agent with launchd via SMAppService.
     func register() throws {
         let service = SMAppService.agent(plistName: agentPlistName)
-        try service.register()
-        isRegistered = service.status == .enabled
+        let preStatus = service.status
+        let preStatusDesc = statusLabel(preStatus)
+
+        logger.info("Attempting agent registration. Pre-status: \(preStatusDesc)")
+
+        // If already awaiting approval, guide the user instead of re-registering.
+        if preStatus == .requiresApproval {
+            logger.info("Agent requires approval — prompting user.")
+            updateStatus(from: service)
+            throw AgentError.agentRequiresApproval
+        }
+
+        // Always attempt registration — .notFound may be the default status
+        // before the first register() call. Let the system decide.
+        do {
+            try service.register()
+        } catch {
+            let postStatus = service.status
+            let statusDesc = statusLabel(postStatus)
+            let errorDesc = error.localizedDescription
+            logger.error("Agent registration failed. Pre: \(preStatusDesc), Post: \(statusDesc). Error: \(errorDesc)")
+            updateStatus(from: service)
+
+            // Surface a more specific error when possible.
+            if postStatus == .requiresApproval {
+                throw AgentError.agentRequiresApproval
+            }
+            throw AgentError.registrationFailed(
+                errorDesc,
+                underlyingStatus: statusDesc,
+            )
+        }
+
+        updateStatus(from: service)
+        let postStatusDesc = statusLabel(service.status)
+        logger.info("Agent registered. Post-status: \(postStatusDesc)")
     }
 
     /// Unregister the shell agent.
@@ -44,13 +105,65 @@ final class ShellAgentService: ObservableObject {
         let service = SMAppService.agent(plistName: agentPlistName)
         try service.unregister()
         isRegistered = false
+        agentStatus = .notRegistered
         tearDownConnection()
     }
 
     /// Refresh the published registration status.
     func refreshStatus() {
+        logBundleDiagnostics()
         let service = SMAppService.agent(plistName: agentPlistName)
-        isRegistered = service.status == .enabled
+        updateStatus(from: service)
+        let currentStatus = agentStatus.rawValue
+        logger.debug("Refreshed agent status: \(currentStatus)")
+    }
+
+    /// Log diagnostic info about the app bundle to help debug .notFound.
+    private func logBundleDiagnostics() {
+        let bundle = Bundle.main
+        let bundlePath = bundle.bundlePath
+        logger.info("App bundle path: \(bundlePath)")
+
+        let plistPath = bundlePath + "/Contents/Library/LaunchAgents/" + agentPlistName
+        let plistExists = FileManager.default.fileExists(atPath: plistPath)
+        logger.info("Agent plist exists at expected path: \(plistExists) (\(plistPath))")
+
+        let binaryPath = bundlePath + "/Contents/MacOS/com.cedricziel.assistant.app.macos.shell-agent"
+        let binaryExists = FileManager.default.fileExists(atPath: binaryPath)
+        logger.info("Agent binary exists at expected path: \(binaryExists) (\(binaryPath))")
+    }
+
+    // MARK: - Status helpers
+
+    private func updateStatus(from service: SMAppService) {
+        let status = service.status
+        switch status {
+        case .enabled:
+            agentStatus = .enabled
+            isRegistered = true
+        case .requiresApproval:
+            agentStatus = .requiresApproval
+            isRegistered = false
+        case .notRegistered:
+            agentStatus = .notRegistered
+            isRegistered = false
+        case .notFound:
+            agentStatus = .notFound
+            isRegistered = false
+        @unknown default:
+            agentStatus = .unknown
+            isRegistered = false
+        }
+    }
+
+    private func statusLabel(_ status: SMAppService.Status) -> String {
+        switch status {
+        case .enabled: "enabled"
+        case .requiresApproval: "requiresApproval"
+        case .notRegistered: "notRegistered"
+        case .notFound: "notFound"
+        @unknown default: "unknown"
+        }
     }
 
     /// Execute a shell command via the agent and return the result.

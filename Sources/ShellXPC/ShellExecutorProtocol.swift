@@ -1,7 +1,7 @@
 import Foundation
 
 /// Mach service name used by the shell agent for XPC registration.
-let shellAgentMachServiceName = "com.cedricziel.assistant.app.shell-agent"
+let shellAgentMachServiceName = "com.cedricziel.assistant.app.macos.shell-agent"
 
 /// Result of a shell command execution, delivered over XPC.
 @objc

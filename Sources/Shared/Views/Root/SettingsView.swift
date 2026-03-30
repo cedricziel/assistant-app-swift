@@ -93,6 +93,45 @@ struct SettingsView: View {
             )
             .font(.callout)
             .foregroundStyle(.secondary)
+
+            shellAgentStatusView
+        }
+    }
+
+    @ViewBuilder
+    private var shellAgentStatusView: some View {
+        switch shellAgentService.agentStatus {
+        case .requiresApproval:
+            VStack(alignment: .leading, spacing: 4) {
+                Label("Requires Approval", systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.orange)
+                    .font(.callout)
+                Text(
+                    "Open System Settings \u{2192} General \u{2192} Login Items "
+                        + "and enable the agent for this app.",
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                Button("Open Login Items\u{2026}") {
+                    openLoginItemsSettings()
+                }
+                .font(.caption)
+            }
+        case .notFound:
+            Label(
+                "Agent not found in app bundle. Try a clean build.",
+                systemImage: "xmark.circle",
+            )
+            .foregroundStyle(.red)
+            .font(.callout)
+        case .enabled, .notRegistered, .unknown:
+            EmptyView()
+        }
+    }
+
+    private func openLoginItemsSettings() {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension") {
+            NSWorkspace.shared.open(url)
         }
     }
     #endif

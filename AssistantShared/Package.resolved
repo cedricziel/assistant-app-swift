@@ -15,8 +15,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/MacPaw/OpenAI.git",
       "state" : {
-        "revision" : "28884fcfb15946b119b6eb3498e5a900c1d8d595",
-        "version" : "0.4.7"
+        "revision" : "3f2cac98d3e98d6b4d90279bd737190fc343dbc4",
+        "version" : "0.4.8"
       }
     },
     {
@@ -51,8 +51,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-openapi-runtime",
       "state" : {
-        "revision" : "16c8eb7f65d28f5ddb8cb0dc1be5ec32e796fe45",
-        "version" : "1.10.1"
+        "revision" : "f039fa6d6338aab5164f3d1be16281524c9a8f89",
+        "version" : "1.11.0"
       }
     }
   ],
