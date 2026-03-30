@@ -62,7 +62,11 @@ struct ChatView: View {
                     scrollToBottom(proxy: proxy)
                 }
                 .onChange(of: toolApproval.pendingRequest?.id) {
-                    scrollToBottom(proxy: proxy)
+                    if let approval = pendingApprovalForThread {
+                        scrollToApproval(proxy: proxy, approvalID: approval.id)
+                    } else {
+                        scrollToBottom(proxy: proxy)
+                    }
                 }
                 .onAppear {
                     scrollToBottom(proxy: proxy)
@@ -126,13 +130,24 @@ struct ChatView: View {
         let anchor: UnitPoint = .bottom
         DispatchQueue.main.async {
             withAnimation(.easeInOut(duration: 0.25)) {
-                if isSending, chatStore.streamingContent(for: thread.id) != nil {
+                if let request = pendingApprovalForThread {
+                    proxy.scrollTo("tool-approval-\(request.id)", anchor: anchor)
+                } else if isSending, chatStore.streamingContent(for: thread.id) != nil {
                     proxy.scrollTo("streaming-message", anchor: anchor)
                 } else if isSending {
                     proxy.scrollTo("typing-indicator", anchor: anchor)
                 } else if let messageID = thread.messages.last?.id {
                     proxy.scrollTo(messageID, anchor: anchor)
                 }
+            }
+        }
+    }
+
+    private func scrollToApproval(proxy: ScrollViewProxy, approvalID: String) {
+        let anchor: UnitPoint = .bottom
+        DispatchQueue.main.async {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                proxy.scrollTo("tool-approval-\(approvalID)", anchor: anchor)
             }
         }
     }

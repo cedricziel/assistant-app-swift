@@ -48,7 +48,6 @@ struct ToolApprovalView: View {
                 Text(command)
                     .font(.system(.callout, design: .monospaced))
                     .textSelection(.enabled)
-                    .lineLimit(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
                     .background(

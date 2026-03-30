@@ -20,7 +20,7 @@ struct OpenAISubscriptionAuthService {
         case authorizationDeclined
         case authorizationTimedOut
         case tokenExchangeFailed
-        case decodeFailed(step: String, underlying: Error, responsePreview: String)
+        case decodeFailed(step: String, underlying: Error)
 
         var errorDescription: String? {
             switch self {
@@ -32,8 +32,8 @@ struct OpenAISubscriptionAuthService {
                 "Authorization timed out. Try connecting again."
             case .tokenExchangeFailed:
                 "Could not exchange authorization code for tokens."
-            case let .decodeFailed(step, underlying, preview):
-                "Failed to decode \(step) response: \(underlying.localizedDescription) [\(preview)]"
+            case let .decodeFailed(step, underlying):
+                "Failed to decode \(step) response: \(underlying.localizedDescription)"
             }
         }
     }
@@ -77,16 +77,11 @@ struct OpenAISubscriptionAuthService {
             throw AuthError.authorizationDeclined
         }
 
-        let payload: DeviceStartResponse
-        do {
-            payload = try snakeCaseDecoder.decode(DeviceStartResponse.self, from: data)
-        } catch {
-            throw AuthError.decodeFailed(
-                step: "device authorization",
-                underlying: error,
-                responsePreview: responsePreview(data),
-            )
-        }
+        let payload: DeviceStartResponse = try decodeOrThrow(
+            DeviceStartResponse.self,
+            from: data,
+            step: "device authorization",
+        )
         let interval = max(Double(payload.interval) ?? 5.0, 1.0)
 
         return DeviceAuthorization(
@@ -118,16 +113,11 @@ struct OpenAISubscriptionAuthService {
             }
 
             if httpResponse.statusCode == 200 {
-                let codePayload: DevicePollResponse
-                do {
-                    codePayload = try snakeCaseDecoder.decode(DevicePollResponse.self, from: data)
-                } catch {
-                    throw AuthError.decodeFailed(
-                        step: "device poll",
-                        underlying: error,
-                        responsePreview: responsePreview(data),
-                    )
-                }
+                let codePayload: DevicePollResponse = try decodeOrThrow(
+                    DevicePollResponse.self,
+                    from: data,
+                    step: "device poll",
+                )
                 return try await exchangeCodeForTokens(
                     authorizationCode: codePayload.authorizationCode,
                     codeVerifier: codePayload.codeVerifier,
@@ -161,16 +151,11 @@ struct OpenAISubscriptionAuthService {
             throw AuthError.tokenExchangeFailed
         }
 
-        let tokenResponse: TokenResponse
-        do {
-            tokenResponse = try snakeCaseDecoder.decode(TokenResponse.self, from: data)
-        } catch {
-            throw AuthError.decodeFailed(
-                step: "token refresh",
-                underlying: error,
-                responsePreview: responsePreview(data),
-            )
-        }
+        let tokenResponse: TokenResponse = try decodeOrThrow(
+            TokenResponse.self,
+            from: data,
+            step: "token refresh",
+        )
         return TokenBundle(
             accessToken: tokenResponse.accessToken,
             refreshToken: tokenResponse.refreshToken,
@@ -196,16 +181,11 @@ struct OpenAISubscriptionAuthService {
             throw AuthError.tokenExchangeFailed
         }
 
-        let tokenResponse: TokenResponse
-        do {
-            tokenResponse = try snakeCaseDecoder.decode(TokenResponse.self, from: data)
-        } catch {
-            throw AuthError.decodeFailed(
-                step: "token exchange",
-                underlying: error,
-                responsePreview: responsePreview(data),
-            )
-        }
+        let tokenResponse: TokenResponse = try decodeOrThrow(
+            TokenResponse.self,
+            from: data,
+            step: "token exchange",
+        )
         return TokenBundle(
             accessToken: tokenResponse.accessToken,
             refreshToken: tokenResponse.refreshToken,
@@ -273,10 +253,16 @@ struct OpenAISubscriptionAuthService {
         return nil
     }
 
-    /// Truncated preview of response body for error diagnostics (no secrets).
-    private func responsePreview(_ data: Data) -> String {
-        let raw = String(data: data.prefix(200), encoding: .utf8) ?? "(binary)"
-        return raw.count < data.count ? raw + "..." : raw
+    private func decodeOrThrow<T: Decodable>(
+        _: T.Type,
+        from data: Data,
+        step: String,
+    ) throws -> T {
+        do {
+            return try snakeCaseDecoder.decode(T.self, from: data)
+        } catch {
+            throw AuthError.decodeFailed(step: step, underlying: error)
+        }
     }
 }
 

@@ -173,28 +173,43 @@ final class ShellAgentService: ObservableObject {
         environment: [String: String] = [:],
         workingDirectory: String? = nil,
     ) async throws -> ShellExecutionResult {
-        let proxy = try proxy()
+        let conn = try ensureConnection()
 
         return try await withCheckedThrowingContinuation { continuation in
+            let lock = NSLock()
+            var isResolved = false
+
+            let resolve: (Result<ShellExecutionResult, Error>) -> Void = { result in
+                lock.lock()
+                defer { lock.unlock() }
+                guard !isResolved else { return }
+                isResolved = true
+                continuation.resume(with: result)
+            }
+
+            guard let proxy = conn.remoteObjectProxyWithErrorHandler({ error in
+                resolve(.failure(error))
+            }) as? ShellExecutorProtocol else {
+                resolve(.failure(AgentError.connectionFailed("Could not obtain remote object proxy.")))
+                return
+            }
+
             proxy.execute(
                 executablePath: executablePath,
                 arguments: arguments,
                 environment: environment,
                 workingDirectory: workingDirectory,
             ) { result in
-                continuation.resume(returning: result)
+                resolve(.success(result))
             }
         }
     }
 
     // MARK: - Private
 
-    private func proxy() throws -> ShellExecutorProtocol {
+    private func ensureConnection() throws -> NSXPCConnection {
         if let existing = connection {
-            if let proxy = existing.remoteObjectProxy as? ShellExecutorProtocol {
-                return proxy
-            }
-            tearDownConnection()
+            return existing
         }
 
         let conn = NSXPCConnection(machServiceName: shellAgentMachServiceName)
@@ -229,10 +244,7 @@ final class ShellAgentService: ObservableObject {
         conn.resume()
         connection = conn
 
-        guard let proxy = conn.remoteObjectProxy as? ShellExecutorProtocol else {
-            throw AgentError.connectionFailed("Could not obtain remote object proxy.")
-        }
-        return proxy
+        return conn
     }
 
     private func tearDownConnection() {

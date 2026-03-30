@@ -177,13 +177,19 @@ struct AgentLoop {
         onStream: StreamHandler? = nil,
     ) async throws -> Output {
         var context = ToolLoopContext(trace: trace, intermediateMessages: [], attempt: attempt, threadID: thread.id)
-        let result = try await runOpenAIToolLoop(
-            userMessage: message,
-            account: account,
-            thread: thread,
-            context: &context,
-            onStream: onStream,
-        )
+        let result: ChatMessage
+        do {
+            result = try await runOpenAIToolLoop(
+                userMessage: message,
+                account: account,
+                thread: thread,
+                context: &context,
+                onStream: onStream,
+            )
+        } catch {
+            trace = context.trace
+            throw error
+        }
         context.trace.append(TraceEvent(phase: .completed, detail: "Turn completed.", attempt: attempt))
         trace = context.trace
         return Output(message: result, trace: context.trace, intermediateMessages: context.intermediateMessages)
@@ -232,6 +238,10 @@ struct AgentLoop {
             return true
         }
 
+        if case let OpenAIAssistantService.OpenAIServiceError.httpError(statusCode, _) = error {
+            return 500 ..< 600 ~= statusCode
+        }
+
         guard let remoteError = error as? RemoteAssistantService.RemoteServiceError else {
             return false
         }
@@ -263,14 +273,13 @@ extension AgentLoop {
     }
 
     func runOpenAIToolLoop(
-        userMessage: String,
+        userMessage _: String,
         account: AssistantAccount,
         thread: ChatThread,
         context: inout ToolLoopContext,
         onStream: StreamHandler? = nil,
     ) async throws -> ChatMessage {
         var conversationParams = buildConversationParams(from: thread)
-        conversationParams.append(.user(.init(content: .string(userMessage))))
 
         return try await executeToolRoundTrips(
             conversationParams: &conversationParams,
@@ -436,8 +445,8 @@ extension AgentLoop {
                 arguments: ["-c", args.command],
                 workingDirectory: args.workingDirectory,
             )
-            let stdout = String(data: result.standardOutput, encoding: .utf8) ?? ""
-            let stderr = String(data: result.standardError, encoding: .utf8) ?? ""
+            let stdout = lossyUTF8String(from: result.standardOutput)
+            let stderr = lossyUTF8String(from: result.standardError)
             let output = ToolOutputProcessing.compact(stdout: stdout, stderr: stderr, exitCode: result.exitCode)
             return ToolResult(toolCallID: id, output: output, isError: result.exitCode != 0)
         } catch {
@@ -450,6 +459,16 @@ extension AgentLoop {
         #else
         return ToolResult(toolCallID: id, output: "Shell execution is not available on this platform.", isError: true)
         #endif
+    }
+
+    private func lossyUTF8String(from data: Data) -> String {
+        if let decoded = String(bytes: data, encoding: .utf8) {
+            return decoded
+        }
+        let sanitizedBytes = data.map { byte in
+            byte < 0x80 ? byte : UInt8(ascii: "?")
+        }
+        return String(bytes: sanitizedBytes, encoding: .utf8) ?? ""
     }
 }
 

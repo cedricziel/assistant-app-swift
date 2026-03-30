@@ -20,9 +20,23 @@ final class ToolApprovalCoordinator: ObservableObject {
             return .denied
         }
 
-        return await withCheckedContinuation { cont in
-            self.continuation = cont
-            self.pendingRequest = request
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { cont in
+                continuation = cont
+                pendingRequest = request
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                guard let self,
+                      let continuation
+                else {
+                    return
+                }
+
+                self.continuation = nil
+                pendingRequest = nil
+                continuation.resume(returning: .denied)
+            }
         }
     }
 

@@ -146,6 +146,8 @@ final class ChatStore: ObservableObject {
         let threadIDs = Set((threadsByAccount[account.id] ?? []).map(\.id))
         for threadID in threadIDs {
             loopTraceByThreadID[threadID] = nil
+            streamingContentByThreadID[threadID] = nil
+            pendingThreadIDs.remove(threadID)
         }
         threadsByAccount[account.id] = nil
         hydratedAccountIDs.remove(account.id)

@@ -1,4 +1,18 @@
+import AppKit
 import Foundation
+
+private enum ClientAuthorization {
+    private static let trustedBundleIdentifier = "com.cedricziel.assistant.app.macos"
+
+    static func isTrusted(processIdentifier: pid_t) -> Bool {
+        guard processIdentifier > 0,
+              let application = NSRunningApplication(processIdentifier: processIdentifier)
+        else {
+            return false
+        }
+        return application.bundleIdentifier == trustedBundleIdentifier
+    }
+}
 
 /// XPC listener delegate that vends `ShellExecutorHandler` instances
 /// to incoming connections from the sandboxed main app.
@@ -7,6 +21,14 @@ final class AgentDelegate: NSObject, NSXPCListenerDelegate {
         _: NSXPCListener,
         shouldAcceptNewConnection newConnection: NSXPCConnection,
     ) -> Bool {
+        guard ClientAuthorization.isTrusted(processIdentifier: newConnection.processIdentifier) else {
+            newConnection.exportedInterface = nil
+            newConnection.exportedObject = nil
+            newConnection.invalidationHandler = nil
+            newConnection.invalidate()
+            return false
+        }
+
         let interface = NSXPCInterface(with: ShellExecutorProtocol.self)
 
         // Allow ShellExecutionResult in reply blocks.

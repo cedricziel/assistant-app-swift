@@ -22,9 +22,14 @@ final class ShellExecutionResult: NSObject, NSSecureCoding, @unchecked Sendable 
     }
 
     required init?(coder: NSCoder) {
+        guard let standardOutput = coder.decodeObject(of: NSData.self, forKey: "standardOutput") as Data?,
+              let standardError = coder.decodeObject(of: NSData.self, forKey: "standardError") as Data?
+        else {
+            return nil
+        }
         exitCode = coder.decodeInt32(forKey: "exitCode")
-        standardOutput = coder.decodeObject(of: NSData.self, forKey: "standardOutput")! as Data
-        standardError = coder.decodeObject(of: NSData.self, forKey: "standardError")! as Data
+        self.standardOutput = standardOutput
+        self.standardError = standardError
     }
 
     func encode(with coder: NSCoder) {

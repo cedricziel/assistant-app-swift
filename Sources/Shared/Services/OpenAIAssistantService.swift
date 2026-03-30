@@ -279,10 +279,4 @@ struct OpenAIAssistantService {
         }
         return result
     }
-
-    /// Truncated preview of response body for error diagnostics.
-    private func responsePreview(_ data: Data) -> String {
-        let raw = String(data: data.prefix(300), encoding: .utf8) ?? "(binary)"
-        return raw.count < data.count ? raw + "..." : raw
-    }
 }

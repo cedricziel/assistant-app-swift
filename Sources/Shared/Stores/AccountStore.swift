@@ -364,12 +364,16 @@ extension AccountStore {
             return "Unexpected response: missing field \"\(key.stringValue)\"\(location)."
         case let .typeMismatch(type, context):
             let path = context.codingPath.map(\.stringValue).joined(separator: ".")
-            return "Unexpected response: wrong type for \"\(path)\" (expected \(type))."
+            let field = path.isEmpty ? "<root>" : path
+            return "Unexpected response: wrong type for \"\(field)\" (expected \(type))."
         case let .valueNotFound(type, context):
             let path = context.codingPath.map(\.stringValue).joined(separator: ".")
-            return "Unexpected response: null value for \"\(path)\" (expected \(type))."
+            let field = path.isEmpty ? "<root>" : path
+            return "Unexpected response: null value for \"\(field)\" (expected \(type))."
         case let .dataCorrupted(context):
-            return "Unexpected response: \(context.debugDescription)"
+            let path = context.codingPath.map(\.stringValue).joined(separator: ".")
+            let location = path.isEmpty ? "" : " at \"\(path)\""
+            return "Unexpected response: malformed payload\(location)."
         @unknown default:
             return "Unexpected response format."
         }

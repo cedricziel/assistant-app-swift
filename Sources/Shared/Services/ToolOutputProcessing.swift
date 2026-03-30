@@ -10,6 +10,10 @@ enum ToolOutputProcessing {
     static let tailChars = 20000
     /// Maximum number of lines to keep per stream.
     static let maxLines = 200
+    private static let csiRegex = try? NSRegularExpression(pattern: "\u{1b}\\[[0-9;]*[A-Za-z]")
+    private static let oscRegex = try? NSRegularExpression(pattern: "\u{1b}\\][^\u{07}\u{1b}]*(?:\u{07}|\u{1b}\\\\)")
+    private static let otherEscapeRegex = try? NSRegularExpression(pattern: "\u{1b}[^\\[\\]].?")
+    private static let carriageReturnRegex = try? NSRegularExpression(pattern: "\r(?!\n)")
 
     // MARK: - Public
 
@@ -44,13 +48,13 @@ enum ToolOutputProcessing {
         var result = text
 
         // CSI sequences: ESC [ ... final-byte
-        result = replacePattern(in: result, pattern: "\u{1b}\\[[0-9;]*[A-Za-z]")
+        result = replacePattern(in: result, regex: csiRegex)
         // OSC sequences: ESC ] ... ST (BEL or ESC \)
-        result = replacePattern(in: result, pattern: "\u{1b}\\][^\u{07}\u{1b}]*(?:\u{07}|\u{1b}\\\\)")
+        result = replacePattern(in: result, regex: oscRegex)
         // Other ESC sequences
-        result = replacePattern(in: result, pattern: "\u{1b}[^\\[\\]].?")
+        result = replacePattern(in: result, regex: otherEscapeRegex)
         // Carriage returns (overwrite-style progress bars) not followed by newline
-        result = replacePattern(in: result, pattern: "\r(?!\n)")
+        result = replacePattern(in: result, regex: carriageReturnRegex)
 
         return result
     }
@@ -83,8 +87,8 @@ enum ToolOutputProcessing {
 
     // MARK: - Helpers
 
-    private static func replacePattern(in text: String, pattern: String) -> String {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+    private static func replacePattern(in text: String, regex: NSRegularExpression?) -> String {
+        guard let regex else { return text }
         let range = NSRange(text.startIndex..., in: text)
         return regex.stringByReplacingMatches(in: text, range: range, withTemplate: "")
     }
