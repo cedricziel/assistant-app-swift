@@ -3,29 +3,29 @@ import SwiftUI
 struct RootContainerView: View {
     @EnvironmentObject private var accountStore: AccountStore
     @EnvironmentObject private var chatStore: ChatStore
-    @State private var showingAccountSheet = false
+    @State private var showingSettings = false
 
     var body: some View {
         Group {
             if accountStore.hasAccounts {
-                ChatSceneView(showAccountSheet: $showingAccountSheet)
+                ChatSceneView(showSettings: $showingSettings)
             } else {
                 LoginView(mode: .initial)
                     .transition(.opacity)
             }
         }
-        .sheet(isPresented: $showingAccountSheet) {
+        .sheet(isPresented: $showingSettings) {
             NavigationStack {
-                LoginView(mode: .additional)
+                SettingsView()
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
                             Button("Close") {
-                                showingAccountSheet = false
+                                showingSettings = false
                             }
                         }
                     }
             }
-            .presentationDetents([.fraction(0.75), .large])
+            .presentationDetents([.large])
         }
         .task(id: accountStore.accounts) {
             for account in accountStore.accounts {
