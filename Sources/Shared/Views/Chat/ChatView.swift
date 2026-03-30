@@ -54,7 +54,7 @@ struct ChatView: View {
                     .padding(.horizontal)
                     .padding(.vertical, 16)
                 }
-                .background(Color(red: 0.96, green: 0.97, blue: 0.98))
+                .background(Color.chatSurfaceBackground)
                 .onChange(of: thread.messages.count) {
                     scrollToBottom(proxy: proxy)
                 }
@@ -218,9 +218,27 @@ private struct TypingIndicatorView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color(red: 0.93, green: 0.95, blue: 0.99))
+        .background(Color.typingIndicatorBackground)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .onAppear { isAnimating = true }
+    }
+}
+
+private extension Color {
+    static var chatSurfaceBackground: Color {
+        #if os(iOS)
+        Color(uiColor: .systemGroupedBackground)
+        #elseif os(macOS)
+        Color(nsColor: .windowBackgroundColor)
+        #endif
+    }
+
+    static var typingIndicatorBackground: Color {
+        #if os(iOS)
+        Color(uiColor: .secondarySystemBackground)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #endif
     }
 }
 

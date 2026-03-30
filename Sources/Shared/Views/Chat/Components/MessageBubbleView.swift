@@ -68,14 +68,40 @@ struct MessageBubbleView: View {
     private var bubbleBackground: some ShapeStyle {
         switch message.role {
         case .assistant:
-            Color(red: 0.93, green: 0.95, blue: 0.99)
+            Color.assistantBubbleBackground
         case .system:
-            Color(red: 0.85, green: 0.87, blue: 0.92)
+            Color.systemBubbleBackground
         case .user:
             Color.accentColor
         case .tool:
-            Color(red: 0.90, green: 0.92, blue: 0.88)
+            Color.toolBubbleBackground
         }
+    }
+}
+
+private extension Color {
+    static var assistantBubbleBackground: Color {
+        #if os(iOS)
+        Color(uiColor: .secondarySystemBackground)
+        #elseif os(macOS)
+        Color(nsColor: .controlBackgroundColor)
+        #endif
+    }
+
+    static var systemBubbleBackground: Color {
+        #if os(iOS)
+        Color(uiColor: .tertiarySystemBackground)
+        #elseif os(macOS)
+        Color(nsColor: .underPageBackgroundColor)
+        #endif
+    }
+
+    static var toolBubbleBackground: Color {
+        #if os(iOS)
+        Color(uiColor: .systemGray6)
+        #elseif os(macOS)
+        Color(nsColor: .textBackgroundColor)
+        #endif
     }
 }
 
